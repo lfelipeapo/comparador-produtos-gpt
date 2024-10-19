@@ -5,10 +5,6 @@ import time
 
 app = FastAPI()
 
-# Substitua pelas suas chaves corretas
-OPENAI_API_KEY = "SUA_OPENAI_API_KEY_CORRETA_AQUI"
-ASSISTANT_ID = "assistente_ID_que_você_tem"
-
 # Configurar o cliente OpenAI com a chave correta
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -54,7 +50,7 @@ def send_products_to_api(products):
 @app.get("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no Google
-    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key=SUA_GOOGLE_API_KEY_CORRETA_AQUI&cx=1717f12744a804305").json()
+    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key=GOOGLE_API_KEYI&cx=cx").json()
 
     # Enviar a lista de produtos para a API
     products = search_results.get('items', [])
