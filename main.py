@@ -74,13 +74,5 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     products = search_results.get('items', [])
     result = send_products_to_api(products)
 
-    # Formate a resposta
-    response = {
-        "relatedProducts": [],
-        "comparison": result,
-        "datastamp": datetime.now().isoformat(),
-        "error": False,
-        "errorMessage": None
-    }
-
-    return response
+    # Retornar a resposta em formato JSON
+    return eval(result)
