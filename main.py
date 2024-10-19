@@ -50,8 +50,18 @@ def send_products_to_api(products):
         thread_id=thread.id
     )
 
+    # Extrair as informações da resposta do OpenAI
+    result = None
+    for message in messages:
+        for content in message.content:
+            if content.text:
+                result = content.text.value
+                break
+        if result:
+            break
+
     # Retornar a última resposta do assistente
-    return messages['data'][-1]['content'][0]['text']['value']
+    return result
 
 # Endpoint de pesquisa de produtos
 @app.get("/search_product/")
