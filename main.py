@@ -67,7 +67,7 @@ def send_products_to_api(products):
 @app.get("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no Google
-    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key=GOOGLE_API_KEYI&cx=cx").json()
+    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key=GOOGLE_API_KEY&cx=cx").json()
 
     # Enviar a lista de produtos para a API
     products = search_results.get('items', [])
