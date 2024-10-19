@@ -3,6 +3,7 @@ from openai import OpenAI
 import requests
 import time
 import os
+from datetime import datetime
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -14,6 +15,26 @@ app = FastAPI()
 
 # Configurar o cliente OpenAI com a chave correta
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+# Função para filtrar produtos
+def filtrar_produtos(produtos):
+    produtos_filtrados = []
+    marcas_vistas = set()
+    for produto in produtos:
+        try:
+            marca = produto['brand']
+            if marca in marcas_vistas:
+                continue
+            data_inicio_oferta = datetime.strptime(produto['offerDetails']['promoStartDate'], '%Y-%m-%d')
+            data_expiracao_oferta = datetime.strptime(produto['offerDetails']['promoExpiration'], '%Y-%m-%d')
+            if data_inicio_oferta <= datetime.now() <= data_expiracao_oferta:
+                produtos_filtrados.append(produto)
+                marcas_vistas.add(marca)
+            if len(produtos_filtrados) >= 5:
+                break
+        except (KeyError, ValueError):
+            continue
+    return produtos_filtrados
 
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products):
@@ -67,10 +88,22 @@ def send_products_to_api(products):
 @app.get("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no Google
-    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key=GOOGLE_API_KEY&cx=cx").json()
+    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key={GOOGLE_API_KEY}&cx={cx}").json()
+
+    # Filtre os produtos
+    products = search_results.get('items', [])
+    produtos_filtrados = filtrar_produtos(products)
 
     # Enviar a lista de produtos para a API
-    products = search_results.get('items', [])
-    result = send_products_to_api(products)
+    result = send_products_to_api(produtos_filtrados)
 
-    return result
+    # Formate a resposta
+    response = {
+        "relatedProducts": produtos_filtrados,
+        "comparison": result,
+        "datastamp": datetime.now().isoformat(),
+        "error": False,
+        "errorMessage": None
+    }
+
+    return response
