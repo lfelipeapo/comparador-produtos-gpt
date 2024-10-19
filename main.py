@@ -2,6 +2,13 @@ from fastapi import FastAPI, HTTPException, Query
 from openai import OpenAI
 import requests
 import time
+import os
+
+# Configurar o cliente OpenAI com a chave correta
+OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
+ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
+GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+cx = os.environ.get('cx')
 
 app = FastAPI()
 
