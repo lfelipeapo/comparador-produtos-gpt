@@ -4,6 +4,7 @@ import requests
 import time
 import os
 from datetime import datetime
+import json
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -75,4 +76,4 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     result = send_products_to_api(products)
 
     # Retornar a resposta em formato JSON
-    return eval(result)
+    return json.loads(result)
