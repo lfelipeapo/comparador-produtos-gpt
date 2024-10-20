@@ -352,11 +352,18 @@ def search_products_by_type():
         products = search_results.get('items', [])
         results[product_type] = products
 
-    # Enviar a lista de produtos para a API
+   # Enviar a lista de produtos para a API
     result = send_products_to_api(results, ASSISTANT_ID_GROUP)
-
-    # Retornar a resposta em formato JSON
-    return json.loads(result)
+    
+    # Verificar se a resposta é vazia ou não é um JSON válido
+    if result is None or result == "":
+        return {"error": "Resposta vazia ou não é um JSON válido"}
+    else:
+        try:
+            # Retornar a resposta em formato JSON
+            return json.loads(result)
+        except json.JSONDecodeError:
+            return {"error": "Resposta não é um JSON válido"}
 
 # Endpoint de pesquisa de produtos por tipo
 @app.get("/search_products_by_type/")
