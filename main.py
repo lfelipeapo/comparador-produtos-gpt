@@ -72,13 +72,20 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no Google
     search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key={GOOGLE_API_KEY}&cx={cx}").json()
 
-    # Enviar a lista de produtos para a API
-    products = search_results.get('items', [])
-    result = send_products_to_api(products, ASSISTANT_ID)
+    # Verificar se a resposta é vazia ou não é um JSON válido
+    if search_results is None or search_results == "":
+        return {"error": "Resposta vazia ou não é um JSON válido"}
+    else:
+        try:
+            # Enviar a lista de produtos para a API
+            products = search_results.get('items', [])
+            result = send_products_to_api(products, ASSISTANT_ID)
 
-    # Retornar a resposta em formato JSON
-    return json.loads(result)
-
+            # Retornar a resposta em formato JSON
+            return json.loads(result)
+        except json.JSONDecodeError:
+            return {"error": "Resposta não é um JSON válido"}
+            
 # Função para pesquisar produtos por tipo
 def search_products_by_type():
     # Lista de tipos de produtos
