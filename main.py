@@ -10,8 +10,9 @@ import json
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
-GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
-cx = os.environ.get('cx')
+SEARXNG_UNIFIED_ENDPOINT = os.environ.get('SEARXNG_UNIFIED_ENDPOINT')
+# GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
+# cx = os.environ.get('cx')
 
 app = FastAPI()
 
@@ -69,22 +70,33 @@ def send_products_to_api(products, assistant_id):
 # Endpoint de pesquisa de produtos
 @app.get("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
-    # Realizar pesquisa no Google
-    search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_name}&key={GOOGLE_API_KEY}&cx={cx}").json()
+    # Realizar pesquisa no endpoint unificado SearxNG
+    try:
+        search_response = requests.get(
+            f"{SEARXNG_UNIFIED_ENDPOINT}/search",
+            params={
+                "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
+                "format": "json"
+            },
+            timeout=5
+        )
+        search_results = search_response.json()
+    except requests.RequestException:
+        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa")
 
     # Verificar se a resposta é vazia ou não é um JSON válido
-    if search_results is None or search_results == "":
+    if not search_results:
         return {"error": "Resposta vazia ou não é um JSON válido"}
-    else:
-        try:
-            # Enviar a lista de produtos para a API
-            products = search_results.get('items', [])
-            result = send_products_to_api(products, ASSISTANT_ID)
+    
+    try:
+        # Enviar a lista de produtos para a API
+        products = search_results.get('items', [])
+        result = send_products_to_api(products, ASSISTANT_ID)
 
-            # Retornar a resposta em formato JSON
-            return json.loads(result)
-        except json.JSONDecodeError:
-            return {"error": "Resposta não é um JSON válido"}
+        # Retornar a resposta em formato JSON
+        return json.loads(result)
+    except json.JSONDecodeError:
+        return {"error": "Resposta não é um JSON válido"}
             
 # Função para pesquisar produtos por tipo
 def search_products_by_type():
@@ -355,15 +367,26 @@ def search_products_by_type():
 
     # Pesquisar produtos por tipo
     for product_type in product_types:
-        search_results = requests.get(f"https://www.googleapis.com/customsearch/v1?q={product_type}&key={GOOGLE_API_KEY}&cx={cx}").json()
-        products = search_results.get('items', [])
-        results[product_type] = products
+        try:
+            search_response = requests.get(
+                f"{SEARXNG_UNIFIED_ENDPOINT}/search",
+                params={
+                    "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
+                    "format": "json"
+                },
+                timeout=5
+            )
+            search_results = search_response.json()
+            products = search_results.get('items', [])
+            results[product_type] = products
+        except requests.RequestException:
+            results[product_type] = {"error": "Falha na pesquisa"}
 
-   # Enviar a lista de produtos para a API
+    # Enviar a lista de produtos para a API
     result = send_products_to_api(results, ASSISTANT_ID_GROUP)
     
     # Verificar se a resposta é vazia ou não é um JSON válido
-    if result is None or result == "":
+    if not result:
         return {"error": "Resposta vazia ou não é um JSON válido"}
     else:
         try:
