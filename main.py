@@ -15,11 +15,16 @@ app = FastAPI()
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
-SEARXNG_UNIFIED_ENDPOINT = os.environ.get('SEARXNG_UNIFIED_ENDPOINT')
+SEARXNG_ENDPOINTS = [
+    "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
+    "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
+    "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
+    "https://search-mt-w5r6poyq8ojutb2w.onrender.com"
+]
 
 # Verifique se as variáveis de ambiente estão definidas
 missing_vars = []
-for var in ['OPENAI_API_KEY', 'ASSISTANT_ID', 'ASSISTANT_ID_GROUP', 'SEARXNG_UNIFIED_ENDPOINT']:
+for var in ['OPENAI_API_KEY', 'ASSISTANT_ID', 'ASSISTANT_ID_GROUP']:
     if not os.environ.get(var):
         missing_vars.append(var)
 if missing_vars:
@@ -29,6 +34,25 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 
 class ProductRequest(BaseModel):
     product_name: str
+
+# Função de balanceamento de carga e failover para requisição HTTP
+async def load_balancer_request(data, headers, timeout=30):
+    for endpoint in SEARXNG_ENDPOINTS:
+        try:
+            async with httpx.AsyncClient() as client_http:
+                response = await client_http.post(
+                    f"{endpoint}/search",
+                    data=data,
+                    headers=headers,
+                    timeout=timeout
+                )
+                if response.status_code == 200:
+                    return response
+                else:
+                    print(f"Falha no endpoint {endpoint}: {response.status_code}")
+        except httpx.RequestError as e:
+            print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
+    raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 # Função para enviar a lista de produtos para a API
 async def send_products_to_api(products, assistant_id):
@@ -121,49 +145,41 @@ async def search_product(request: ProductRequest):
     # Extrair o nome do produto do corpo da requisição
     product_name = request.product_name
     # Validar e sanitizar o nome do produto
-    validate_and_sanitize_product_name(product_name)
+    product_name = validate_and_sanitize_product_name(product_name)
 
     try:
-        async with httpx.AsyncClient() as client_http:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                              "AppleWebKit/537.36 (KHTML, like Gecko) "
-                              "Chrome/58.0.3029.110 Safari/537.3",
-                "Accept": "application/json",
-                "Accept-Encoding": "gzip, deflate",
-                "Connection": "keep-alive"
-            }
-            search_response = await client_http.post(
-                f"{SEARXNG_UNIFIED_ENDPOINT}/search",
-                data={
-                    "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
-                    "format": "json"
-                },
-                headers=headers,
-                timeout=30
-            )
-            # Log do status e conteúdo da resposta
-            print(f"Status Code: {search_response.status_code}")
-            print(f"Response Content: {search_response.text}")
+        data = {
+            "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
+            "format": "json"
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/58.0.3029.110 Safari/537.3",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
+        }
+        search_response = await load_balancer_request(data, headers)
+        # Log do status e conteúdo da resposta
+        print(f"Status Code: {search_response.status_code}")
+        print(f"Response Content: {search_response.text}")
 
-            if search_response.status_code != 200:
-                raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro.")
+        if search_response.status_code != 200:
+            raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro.")
 
-            try:
-                search_results = search_response.json()
-            except json.JSONDecodeError:
-                raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido.")
+        search_results = search_response.json()
     except httpx.RequestError as e:
         print(f"Erro ao conectar ao serviço de pesquisa: {e}")
         raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
-    except HTTPException as he:
-        raise he
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido.")
     except Exception as e:
         print(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
     if not search_results or 'results' not in search_results:
-        return {"error": "Resposta vazia ou não é um JSON válido."}
+        return {"error": "Resposta vazia ou não contém resultados."}
 
     try:
         products = search_results.get('results', [])
@@ -178,7 +194,7 @@ async def search_product(request: ProductRequest):
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
 
 # Função auxiliar para buscar produtos por tipo
-async def fetch_product_type(client_http, product_type):
+async def fetch_product_type(product_type):
     try:
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -188,32 +204,27 @@ async def fetch_product_type(client_http, product_type):
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive"
         }
-        search_response = await client_http.post(
-            f"{SEARXNG_UNIFIED_ENDPOINT}/search",
-            data={
-                "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
-                "format": "json"
-            },
-            headers=headers,
-            timeout=5
-        )
+        data = {
+            "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
+            "format": "json"
+        }
+        search_response = await load_balancer_request(data, headers)
         # Verifica se o status da resposta é 200 (OK)
         if search_response.status_code != 200:
             return (product_type, {"error": "Falha na pesquisa."})
         # Tenta fazer o parsing do JSON
-        try:
-            search_results = search_response.json()
-            products = search_results.get('results', [])
-            return (product_type, products)
-        except json.JSONDecodeError:
-            return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
+        search_results = search_response.json()
+        products = search_results.get('results', [])
+        return (product_type, products)
     except httpx.RequestError as e:
         print(f"Erro ao conectar ao serviço de pesquisa para o tipo {product_type}: {e}")
         return (product_type, {"error": "Falha na pesquisa."})
+    except json.JSONDecodeError:
+        return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
     except Exception as e:
         print(f"Erro inesperado ao buscar o tipo {product_type}: {e}")
         return (product_type, {"error": "Falha na pesquisa."})
-
+        
 # Função para pesquisar produtos por tipo
 async def search_products_by_type():
     # Lista de tipos de produtos (mantida sem alterações)
@@ -482,12 +493,9 @@ async def search_products_by_type():
     results = {}
 
     # Pesquisar produtos por tipo
-    async with httpx.AsyncClient() as client_http:
-        tasks = []
-        for product_type in product_types:
-            tasks.append(fetch_product_type(client_http, product_type))
-        responses = await asyncio.gather(*tasks)
-        results = dict(responses)
+    tasks = [fetch_product_type(product_type) for product_type in product_types]
+    responses = await asyncio.gather(*tasks)
+    results = dict(responses)
 
     # Enviar a lista de produtos para a API
     try:
