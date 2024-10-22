@@ -122,7 +122,14 @@ async def search_product(request: ProductRequest):
                 },
                 timeout=30
             )
-            search_results = search_response.json()
+            # Verifica se o status da resposta é 200 (OK)
+            if search_response.status_code != 200:
+                raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro")
+            # Tenta fazer o parsing do JSON
+            try:
+                search_results = search_response.json()
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido")
     except httpx.RequestError:
         raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa")
 
@@ -147,9 +154,16 @@ async def fetch_product_type(client_http, product_type):
             },
             timeout=5
         )
-        search_results = search_response.json()
-        products = search_results.get('results', [])
-        return (product_type, products)
+        # Verifica se o status da resposta é 200 (OK)
+        if search_response.status_code != 200:
+            return (product_type, {"error": "Falha na pesquisa"})
+        # Tenta fazer o parsing do JSON
+        try:
+            search_results = search_response.json()
+            products = search_results.get('results', [])
+            return (product_type, products)
+        except json.JSONDecodeError:
+            return (product_type, {"error": "Resposta não é um JSON válido"})
     except httpx.RequestError:
         return (product_type, {"error": "Falha na pesquisa"})
 
