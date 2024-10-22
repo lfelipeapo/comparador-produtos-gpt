@@ -15,10 +15,18 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_UNIFIED_ENDPOINT = os.environ.get('SEARXNG_UNIFIED_ENDPOINT')
-# GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY')
-# cx = os.environ.get('cx')
 
 app = FastAPI()
+
+# Verifique se as variáveis de ambiente estão definidas
+if not OPENAI_API_KEY:
+    raise ValueError("A variável de ambiente 'OPENAI_API_KEY' não está definida.")
+if not ASSISTANT_ID:
+    raise ValueError("A variável de ambiente 'ASSISTANT_ID' não está definida.")
+if not ASSISTANT_ID_GROUP:
+    raise ValueError("A variável de ambiente 'ASSISTANT_ID_GROUP' não está definida.")
+if not SEARXNG_UNIFIED_ENDPOINT:
+    raise ValueError("A variável de ambiente 'SEARXNG_UNIFIED_ENDPOINT' não está definida.")
 
 # Configurar o cliente OpenAI com a chave correta
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -28,62 +36,69 @@ class ProductRequest(BaseModel):
 
 # Função para enviar a lista de produtos para a API
 async def send_products_to_api(products, assistant_id):
-    # Criar o thread
-    thread = await asyncio.to_thread(client.beta.threads.create)
+    try:
+        # Criar o thread
+        thread = await asyncio.to_thread(client.beta.threads.create)
 
-    # Adicionar mensagens ao thread
-    message = await asyncio.to_thread(
-        client.beta.threads.messages.create,
-        thread_id=thread.id,
-        role="user",
-        content=f"{products}"
-    )
-
-    # Executar o thread com o assistente v2
-    run = await asyncio.to_thread(
-        client.beta.threads.runs.create,
-        thread_id=thread.id,
-        assistant_id=assistant_id
-    )
-
-    # Verificar o status do run até ser concluído
-    timeout = 30
-    start_time = time.time()
-    while run.status != "completed":
-        run = await asyncio.to_thread(
-            client.beta.threads.runs.retrieve,
+        # Adicionar mensagens ao thread
+        message = await asyncio.to_thread(
+            client.beta.threads.messages.create,
             thread_id=thread.id,
-            run_id=run.id
+            role="user",
+            content=f"{products}"
         )
-        await asyncio.sleep(0.5)
-        if time.time() - start_time > timeout:
-            raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
 
-    # Recuperar as mensagens do thread após o run ser completado
-    messages = await asyncio.to_thread(
-        client.beta.threads.messages.list,
-        thread_id=thread.id
-    )
+        # Executar o thread com o assistente v2
+        run = await asyncio.to_thread(
+            client.beta.threads.runs.create,
+            thread_id=thread.id,
+            assistant_id=assistant_id
+        )
 
-    # Extrair as informações da resposta do OpenAI
-    result = None
-    for message in messages:
-        for content in message.content:
-            if content.text:
-                result = content.text.value
+        # Verificar o status do run até ser concluído
+        timeout = 30
+        start_time = time.time()
+        while run.status != "completed":
+            run = await asyncio.to_thread(
+                client.beta.threads.runs.retrieve,
+                thread_id=thread.id,
+                run_id=run.id
+            )
+            await asyncio.sleep(0.5)
+            if time.time() - start_time > timeout:
+                raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
+
+        # Recuperar as mensagens do thread após o run ser completado
+        messages = await asyncio.to_thread(
+            client.beta.threads.messages.list,
+            thread_id=thread.id
+        )
+
+        # Extrair as informações da resposta do OpenAI
+        result = None
+        for message in messages:
+            for content in message.content:
+                if content.text:
+                    result = content.text.value
+                    break
+            if result:
                 break
-        if result:
-            break
 
-    # Retornar a última resposta do assistente
-    return result
+        if not result:
+            raise HTTPException(status_code=500, detail="Nenhuma resposta recebida do assistente.")
+
+        # Retornar a última resposta do assistente
+        return result
+    except Exception as e:
+        print(f"Erro em send_products_to_api: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
 
 # Função para validar e sanitizar a entrada do nome do produto
 def validate_and_sanitize_product_name(product_name: str):
     # Validar se existe nome de produto
-    if len(product_name) <= 0:
+    if len(product_name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Nome de produto não informado.")
-    
+
     # Limitar o tamanho do nome do produto para evitar ataques de buffer overflow
     if len(product_name) > 50:
         raise HTTPException(status_code=400, detail="Nome do produto excede o tamanho permitido.")
@@ -94,14 +109,14 @@ def validate_and_sanitize_product_name(product_name: str):
     # Expressão regular para permitir apenas letras, números, espaço, e alguns símbolos seguros (- e _)
     if not re.match(r"^[a-zA-Z0-9 _-]+$", product_name):
         raise HTTPException(status_code=400, detail="Nome do produto contém caracteres inválidos.")
-    
+
     # Prevenção contra SQL injection: restrição simplificada apenas para os termos críticos
     sql_keywords = ["SELECT", "DROP", "INSERT", "DELETE", "UNION", "--", ";"]
 
     for keyword in sql_keywords:
         if re.search(rf"\b{keyword}\b", product_name, re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Nome do produto contém termos suspeitos.")
-    
+
     return product_name
 
 # Endpoint de pesquisa de produtos
@@ -111,12 +126,12 @@ async def search_product(request: ProductRequest):
     product_name = request.product_name
     # Validar e sanitizar o nome do produto
     validate_and_sanitize_product_name(product_name)
-    
+
     try:
         async with httpx.AsyncClient() as client_http:
             search_response = await client_http.post(
                 f"{SEARXNG_UNIFIED_ENDPOINT}/search",
-                params={
+                data={
                     "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
                     "format": "json"
                 },
@@ -127,25 +142,33 @@ async def search_product(request: ProductRequest):
             print(f"Response Content: {search_response.text}")
 
             if search_response.status_code != 200:
-                raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro")
+                raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro.")
+
             try:
                 search_results = search_response.json()
             except json.JSONDecodeError:
-                raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido")
-    except Exception as e:
-        # Log da exceção detalhada
+                raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido.")
+    except httpx.RequestError as e:
         print(f"Erro ao conectar ao serviço de pesquisa: {e}")
-        raise HTTPException(status_code=503, detail=f"Não foi possível conectar ao serviço de pesquisa: {e}")
+        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Erro inesperado: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
-    if not search_results:
-        return {"error": "Resposta vazia ou não é um JSON válido"}
-    
+    if not search_results or 'results' not in search_results:
+        return {"error": "Resposta vazia ou não é um JSON válido."}
+
     try:
         products = search_results.get('results', [])
         result = await send_products_to_api(products, ASSISTANT_ID)
         return json.loads(result)
+    except json.JSONDecodeError:
+        return {"error": "Resposta do assistente não é um JSON válido."}
+    except HTTPException as he:
+        raise he
     except Exception as e:
-        # Log da exceção detalhada
         print(f"Erro ao processar a resposta do assistente: {e}")
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
 
@@ -154,7 +177,7 @@ async def fetch_product_type(client_http, product_type):
     try:
         search_response = await client_http.post(
             f"{SEARXNG_UNIFIED_ENDPOINT}/search",
-            params={
+            data={
                 "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
                 "format": "json"
             },
@@ -162,20 +185,24 @@ async def fetch_product_type(client_http, product_type):
         )
         # Verifica se o status da resposta é 200 (OK)
         if search_response.status_code != 200:
-            return (product_type, {"error": "Falha na pesquisa"})
+            return (product_type, {"error": "Falha na pesquisa."})
         # Tenta fazer o parsing do JSON
         try:
             search_results = search_response.json()
             products = search_results.get('results', [])
             return (product_type, products)
         except json.JSONDecodeError:
-            return (product_type, {"error": "Resposta não é um JSON válido"})
-    except httpx.RequestError:
-        return (product_type, {"error": "Falha na pesquisa"})
+            return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
+    except httpx.RequestError as e:
+        print(f"Erro ao conectar ao serviço de pesquisa para o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
+    except Exception as e:
+        print(f"Erro inesperado ao buscar o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
 
 # Função para pesquisar produtos por tipo
 async def search_products_by_type():
-    # Lista de tipos de produtos
+    # Lista de tipos de produtos (mantida sem alterações)
     product_types = [
         "geladeira",
         "fogão",
@@ -449,17 +476,23 @@ async def search_products_by_type():
         results = dict(responses)
 
     # Enviar a lista de produtos para a API
-    result = await send_products_to_api(results, ASSISTANT_ID_GROUP)
-    
+    try:
+        result = await send_products_to_api(results, ASSISTANT_ID_GROUP)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Erro ao enviar produtos para a API do assistente: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
+
     # Verificar se a resposta é vazia ou não é um JSON válido
     if not result:
-        return {"error": "Resposta vazia ou não é um JSON válido"}
+        return {"error": "Resposta vazia ou não é um JSON válido."}
     else:
         try:
             # Retornar a resposta em formato JSON
             return json.loads(result)
         except json.JSONDecodeError:
-            return {"error": "Resposta não é um JSON válido"}
+            return {"error": "Resposta do assistente não é um JSON válido."}
 
 # Endpoint de pesquisa de produtos por tipo
 @app.post("/search_products_by_type/")
