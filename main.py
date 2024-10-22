@@ -1,10 +1,12 @@
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query
 from openai import OpenAI
+import html
+import json
+import re
 import requests
 import time
 import os
-from datetime import datetime
-import json
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -66,10 +68,6 @@ def send_products_to_api(products, assistant_id):
 
     # Retornar a última resposta do assistente
     return result
-
-import re
-import html
-from fastapi import HTTPException
 
 # Função para validar e sanitizar a entrada do nome do produto
 def validate_and_sanitize_product_name(product_name: str):
