@@ -1,6 +1,7 @@
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Query
 from openai import OpenAI
+from pydantic import BaseModel
 import html
 import json
 import re
@@ -20,6 +21,9 @@ app = FastAPI()
 
 # Configurar o cliente OpenAI com a chave correta
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+class ProductRequest(BaseModel):
+    product_name: str
 
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
@@ -100,10 +104,12 @@ def validate_and_sanitize_product_name(product_name: str):
 
 # Endpoint de pesquisa de produtos
 @app.post("/search_product/")
-def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
-    # Realizar pesquisa no endpoint unificado SearxNG
+def search_product(request: ProductRequest):
+    # Extrair o nome do produto do corpo da requisição
+    product_name = request.product_name
+    # Continue com a lógica de validação e pesquisa
     validate_and_sanitize_product_name(product_name)
-        
+    
     try:
         search_response = requests.get(
             f"{SEARXNG_UNIFIED_ENDPOINT}/search",
@@ -117,20 +123,16 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     except requests.RequestException:
         raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa")
 
-    # Verificar se a resposta é vazia ou não é um JSON válido
     if not search_results:
         return {"error": "Resposta vazia ou não é um JSON válido"}
     
     try:
-        # Enviar a lista de produtos para a API
         products = search_results.get('results', [])
         result = send_products_to_api(products, ASSISTANT_ID)
-
-        # Retornar a resposta em formato JSON
         return json.loads(result)
     except json.JSONDecodeError:
         return {"error": "Resposta não é um JSON válido"}
-            
+        
 # Função para pesquisar produtos por tipo
 def search_products_by_type():
     # Lista de tipos de produtos
