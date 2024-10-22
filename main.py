@@ -190,7 +190,7 @@ async def search_product(request: ProductRequest):
     try:
         products = search_results.get('results', [])
         print(f"Produtos obtidos: {products}")
-        result = await send_products_to_api(products, ASSISTANT_ID)
+        result = send_products_to_api(products, ASSISTANT_ID)
         print(f"Resposta do assistente: {result}")
         return json.loads(result)
     except json.JSONDecodeError:
@@ -508,7 +508,7 @@ async def search_products_by_type():
 
     # Enviar a lista de produtos para a API
     try:
-        result = await send_products_to_api(results, ASSISTANT_ID_GROUP)
+        result = send_products_to_api(results, ASSISTANT_ID_GROUP)
     except HTTPException as he:
         raise he
     except Exception as e:
