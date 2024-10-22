@@ -1,4 +1,5 @@
 import os
+import backoff
 import asyncio
 import httpx
 import json
@@ -36,7 +37,6 @@ class ProductRequest(BaseModel):
     product_name: str
 
 # Função de balanceamento de carga e failover para requisição HTTP
-import backoff
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(data, headers, timeout=30):
