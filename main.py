@@ -90,12 +90,9 @@ def validate_and_sanitize_product_name(product_name: str):
     if not re.match(r"^[a-zA-Z0-9 _-]+$", product_name):
         raise HTTPException(status_code=400, detail="Nome do produto contém caracteres inválidos.")
     
-    # Prevenção contra SQL injection: bloqueia palavras-chave comuns de SQL e certos caracteres especiais
-    sql_keywords = [
-        "SELECT", "DROP", "INSERT", "DELETE", "UPDATE", "UNION", "GRANT", "REVOKE", 
-        "--", ";", "/*", "*/", "xp_", "exec", "sp_", "OR 1=1", "AND 1=1"
-    ]
-    
+    # Prevenção contra SQL injection: restrição simplificada apenas para os termos críticos
+    sql_keywords = ["SELECT", "DROP", "INSERT", "DELETE", "UNION", "--", ";"]
+
     for keyword in sql_keywords:
         if re.search(rf"\b{keyword}\b", product_name, re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Nome do produto contém termos suspeitos.")
