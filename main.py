@@ -73,6 +73,10 @@ from fastapi import HTTPException
 
 # Função para validar e sanitizar a entrada do nome do produto
 def validate_and_sanitize_product_name(product_name: str):
+    #Validar se existe nome de produto
+    if len(product_name) <= 0:
+        raise HTTPException(status_code=400, detail="Nome de produto não informado.")
+    
     # Limitar o tamanho do nome do produto para evitar ataques de buffer overflow
     if len(product_name) > 50:
         raise HTTPException(status_code=400, detail="Nome do produto excede o tamanho permitido.")
