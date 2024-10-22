@@ -36,13 +36,26 @@ class ProductRequest(BaseModel):
     product_name: str
 
 # Função de balanceamento de carga e failover para requisição HTTP
+import backoff
+
+@backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(data, headers, timeout=30):
-    async with httpx.AsyncClient() as client_http:
-        tasks = [client_http.post(f"{endpoint}/search", data=data, headers=headers, timeout=timeout) for endpoint in SEARXNG_ENDPOINTS]
-        responses = await asyncio.gather(*tasks, return_exceptions=True)
-        for response in responses:
-            if isinstance(response, httpx.Response) and response.status_code == 200:
-                return response
+    for endpoint in SEARXNG_ENDPOINTS:
+        try:
+            async with httpx.AsyncClient() as client_http:
+                response = await client_http.post(
+                    f"{endpoint}/search",
+                    data=data,
+                    headers=headers,
+                    timeout=timeout
+                )
+                if response.status_code == 200:
+                    return response
+                else:
+                    print(f"Falha no endpoint {endpoint}: {response.status_code}")
+                    print(f"Resposta: {response.text}")
+        except httpx.RequestError as e:
+            print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 # Função para enviar a lista de produtos para a API
