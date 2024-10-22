@@ -67,10 +67,41 @@ def send_products_to_api(products, assistant_id):
     # Retornar a última resposta do assistente
     return result
 
+import re
+import html
+from fastapi import HTTPException
+
+# Função para validar e sanitizar a entrada do nome do produto
+def validate_and_sanitize_product_name(product_name: str):
+    # Limitar o tamanho do nome do produto para evitar ataques de buffer overflow
+    if len(product_name) > 50:
+        raise HTTPException(status_code=400, detail="Nome do produto excede o tamanho permitido.")
+
+    # Sanitização básica contra XSS
+    product_name = html.escape(product_name)
+
+    # Expressão regular para permitir apenas letras, números, espaço, e alguns símbolos seguros (- e _)
+    if not re.match(r"^[a-zA-Z0-9 _-]+$", product_name):
+        raise HTTPException(status_code=400, detail="Nome do produto contém caracteres inválidos.")
+    
+    # Prevenção contra SQL injection: bloqueia palavras-chave comuns de SQL e certos caracteres especiais
+    sql_keywords = [
+        "SELECT", "DROP", "INSERT", "DELETE", "UPDATE", "UNION", "GRANT", "REVOKE", 
+        "--", ";", "/*", "*/", "xp_", "exec", "sp_", "OR 1=1", "AND 1=1"
+    ]
+    
+    for keyword in sql_keywords:
+        if re.search(rf"\b{keyword}\b", product_name, re.IGNORECASE):
+            raise HTTPException(status_code=400, detail="Nome do produto contém termos suspeitos.")
+    
+    return product_name
+
 # Endpoint de pesquisa de produtos
 @app.post("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no endpoint unificado SearxNG
+    validate_and_sanitize_product_name(product_name)
+        
     try:
         search_response = requests.get(
             f"{SEARXNG_UNIFIED_ENDPOINT}/search",
@@ -78,7 +109,7 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
                 "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
                 "format": "json"
             },
-            timeout=5
+            timeout=30
         )
         search_results = search_response.json()
     except requests.RequestException:
@@ -90,7 +121,7 @@ def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     
     try:
         # Enviar a lista de produtos para a API
-        products = search_results.get('items', [])
+        products = search_results.get('results', [])
         result = send_products_to_api(products, ASSISTANT_ID)
 
         # Retornar a resposta em formato JSON
@@ -377,7 +408,7 @@ def search_products_by_type():
                 timeout=5
             )
             search_results = search_response.json()
-            products = search_results.get('items', [])
+            products = search_results.get('results', [])
             results[product_type] = products
         except requests.RequestException:
             results[product_type] = {"error": "Falha na pesquisa"}
