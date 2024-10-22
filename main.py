@@ -1,14 +1,15 @@
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, Query
-from openai import OpenAI
-from pydantic import BaseModel
-import html
-import json
-import re
-import time
 import os
 import asyncio
-import httpx  # Importa o httpx para requisições assíncronas
+import httpx
+import json
+import html
+import re
+import time
+from fastapi import FastAPI, HTTPException
+from pydantic import BaseModel
+from openai import OpenAI
+
+app = FastAPI()
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -16,19 +17,14 @@ ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_UNIFIED_ENDPOINT = os.environ.get('SEARXNG_UNIFIED_ENDPOINT')
 
-app = FastAPI()
-
 # Verifique se as variáveis de ambiente estão definidas
-if not OPENAI_API_KEY:
-    raise ValueError("A variável de ambiente 'OPENAI_API_KEY' não está definida.")
-if not ASSISTANT_ID:
-    raise ValueError("A variável de ambiente 'ASSISTANT_ID' não está definida.")
-if not ASSISTANT_ID_GROUP:
-    raise ValueError("A variável de ambiente 'ASSISTANT_ID_GROUP' não está definida.")
-if not SEARXNG_UNIFIED_ENDPOINT:
-    raise ValueError("A variável de ambiente 'SEARXNG_UNIFIED_ENDPOINT' não está definida.")
+missing_vars = []
+for var in ['OPENAI_API_KEY', 'ASSISTANT_ID', 'ASSISTANT_ID_GROUP', 'SEARXNG_UNIFIED_ENDPOINT']:
+    if not os.environ.get(var):
+        missing_vars.append(var)
+if missing_vars:
+    raise ValueError(f"As seguintes variáveis de ambiente não estão definidas: {', '.join(missing_vars)}")
 
-# Configurar o cliente OpenAI com a chave correta
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 class ProductRequest(BaseModel):
@@ -129,12 +125,21 @@ async def search_product(request: ProductRequest):
 
     try:
         async with httpx.AsyncClient() as client_http:
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                              "AppleWebKit/537.36 (KHTML, like Gecko) "
+                              "Chrome/58.0.3029.110 Safari/537.3",
+                "Accept": "application/json",
+                "Accept-Encoding": "gzip, deflate",
+                "Connection": "keep-alive"
+            }
             search_response = await client_http.post(
                 f"{SEARXNG_UNIFIED_ENDPOINT}/search",
                 data={
                     "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
                     "format": "json"
                 },
+                headers=headers,
                 timeout=30
             )
             # Log do status e conteúdo da resposta
@@ -175,12 +180,21 @@ async def search_product(request: ProductRequest):
 # Função auxiliar para buscar produtos por tipo
 async def fetch_product_type(client_http, product_type):
     try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/58.0.3029.110 Safari/537.3",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
+        }
         search_response = await client_http.post(
             f"{SEARXNG_UNIFIED_ENDPOINT}/search",
             data={
                 "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
                 "format": "json"
             },
+            headers=headers,
             timeout=5
         )
         # Verifica se o status da resposta é 200 (OK)
@@ -498,3 +512,8 @@ async def search_products_by_type():
 @app.post("/search_products_by_type/")
 async def search_products_by_type_endpoint():
     return await search_products_by_type()
+
+# Endpoint de saúde para verificação rápida
+@app.get("/health")
+async def health_check():
+    return {"status": "OK"}
