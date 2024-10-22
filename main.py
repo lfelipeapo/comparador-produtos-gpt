@@ -109,12 +109,12 @@ def validate_and_sanitize_product_name(product_name: str):
 async def search_product(request: ProductRequest):
     # Extrair o nome do produto do corpo da requisição
     product_name = request.product_name
-    # Continue com a lógica de validação e pesquisa
+    # Validar e sanitizar o nome do produto
     validate_and_sanitize_product_name(product_name)
     
     try:
         async with httpx.AsyncClient() as client_http:
-            search_response = await client_http.get(
+            search_response = await client_http.post(
                 f"{SEARXNG_UNIFIED_ENDPOINT}/search",
                 params={
                     "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
@@ -122,16 +122,20 @@ async def search_product(request: ProductRequest):
                 },
                 timeout=30
             )
-            # Verifica se o status da resposta é 200 (OK)
+            # Log do status e conteúdo da resposta
+            print(f"Status Code: {search_response.status_code}")
+            print(f"Response Content: {search_response.text}")
+
             if search_response.status_code != 200:
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro")
-            # Tenta fazer o parsing do JSON
             try:
                 search_results = search_response.json()
             except json.JSONDecodeError:
                 raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido")
-    except httpx.RequestError:
-        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa")
+    except Exception as e:
+        # Log da exceção detalhada
+        print(f"Erro ao conectar ao serviço de pesquisa: {e}")
+        raise HTTPException(status_code=503, detail=f"Não foi possível conectar ao serviço de pesquisa: {e}")
 
     if not search_results:
         return {"error": "Resposta vazia ou não é um JSON válido"}
@@ -140,13 +144,15 @@ async def search_product(request: ProductRequest):
         products = search_results.get('results', [])
         result = await send_products_to_api(products, ASSISTANT_ID)
         return json.loads(result)
-    except json.JSONDecodeError:
-        return {"error": "Resposta não é um JSON válido"}
-        
+    except Exception as e:
+        # Log da exceção detalhada
+        print(f"Erro ao processar a resposta do assistente: {e}")
+        return {"error": f"Erro ao processar a resposta do assistente: {e}"}
+
 # Função auxiliar para buscar produtos por tipo
 async def fetch_product_type(client_http, product_type):
     try:
-        search_response = await client_http.get(
+        search_response = await client_http.post(
             f"{SEARXNG_UNIFIED_ENDPOINT}/search",
             params={
                 "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
