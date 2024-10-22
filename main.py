@@ -37,21 +37,12 @@ class ProductRequest(BaseModel):
 
 # Função de balanceamento de carga e failover para requisição HTTP
 async def load_balancer_request(data, headers, timeout=30):
-    for endpoint in SEARXNG_ENDPOINTS:
-        try:
-            async with httpx.AsyncClient() as client_http:
-                response = await client_http.post(
-                    f"{endpoint}/search",
-                    data=data,
-                    headers=headers,
-                    timeout=timeout
-                )
-                if response.status_code == 200:
-                    return response
-                else:
-                    print(f"Falha no endpoint {endpoint}: {response.status_code}")
-        except httpx.RequestError as e:
-            print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
+    async with httpx.AsyncClient() as client_http:
+        tasks = [client_http.post(f"{endpoint}/search", data=data, headers=headers, timeout=timeout) for endpoint in SEARXNG_ENDPOINTS]
+        responses = await asyncio.gather(*tasks, return_exceptions=True)
+        for response in responses:
+            if isinstance(response, httpx.Response) and response.status_code == 200:
+                return response
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 # Função para enviar a lista de produtos para a API
@@ -179,7 +170,7 @@ async def search_product(request: ProductRequest):
         raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
     if not search_results or 'results' not in search_results:
-        return {"error": "Resposta vazia ou não contém resultados."}
+        raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
 
     try:
         products = search_results.get('results', [])
