@@ -60,62 +60,51 @@ async def load_balancer_request(data, headers, timeout=30):
 
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
-    if not products or not isinstance(products, list):
-        raise HTTPException(status_code=400, detail="Nenhum produto encontrado para enviar ao assistente.")
+    # Criar o thread
+    thread = client.beta.threads.create()
 
-    try:
-        # Criar o thread
-        thread = client.beta.threads.create()
+    # Adicionar mensagens ao thread
+    message = client.beta.threads.messages.create(
+        thread_id=thread.id,
+        role="user",
+        content=f"{products}"
+    )
 
-        # Adicionar mensagens ao thread
-        # Corrigindo o envio do conteúdo para garantir que o formato JSON seja mantido
-        message = client.beta.threads.messages.create(
+    # Executar o thread com o assistente v2
+    run = client.beta.threads.runs.create(
+        thread_id=thread.id,
+        assistant_id=assistant_id
+    )
+
+    # Verificar o status do run até ser concluído
+    timeout = 30
+    start_time = time.time()
+    while run.status != "completed":
+        run = client.beta.threads.runs.retrieve(
             thread_id=thread.id,
-            role="user",
-            content=json.dumps(products)  # Converte a lista para JSON
+            run_id=run.id
         )
+        time.sleep(0.5)
+        if time.time() - start_time > timeout:
+            raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
 
-        # Executar o thread com o assistente v2
-        run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant_id
-        )
+    # Recuperar as mensagens do thread após o run ser completado
+    messages = client.beta.threads.messages.list(
+        thread_id=thread.id
+    )
 
-        # Verificar o status do run até ser concluído
-        timeout = 60  # Aumentar timeout para 60 segundos
-        start_time = time.time()
-        while run.status != "completed":
-            run = client.beta.threads.runs.retrieve(
-                thread_id=thread.id,
-                run_id=run.id
-            )
-            time.sleep(0.5)
-            if time.time() - start_time > timeout:
-                raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
-
-        # Recuperar as mensagens do thread após o run ser completado
-        messages = client.beta.threads.messages.list(thread_id=thread.id)
-
-        # Extrair as informações da resposta do OpenAI
-        result = None
-        for message in messages:
-            if 'content' in message and isinstance(message['content'], list):
-                for content in message['content']:
-                    if 'text' in content and 'value' in content['text']:
-                        result = content['text']['value']
-                        break
-            if result:
+    # Extrair as informações da resposta do OpenAI
+    result = None
+    for message in messages:
+        for content in message.content:
+            if content.text:
+                result = content.text.value
                 break
+        if result:
+            break
 
-        if not result:
-            raise HTTPException(status_code=500, detail="Nenhuma resposta recebida do assistente.")
-
-        # Retornar a última resposta do assistente
-        return result
-
-    except Exception as e:
-        print(f"Erro em send_products_to_api: {e}")
-        raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
+    # Retornar a última resposta do assistente
+    return result
 
 # Função para validar e sanitizar a entrada do nome do produto
 def validate_and_sanitize_product_name(product_name: str):
