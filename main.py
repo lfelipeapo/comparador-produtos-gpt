@@ -68,7 +68,7 @@ def send_products_to_api(products, assistant_id):
     return result
 
 # Endpoint de pesquisa de produtos
-@app.get("/search_product/")
+@app.post("/search_product/")
 def search_product(product_name: str = Query(..., min_length=3, max_length=50)):
     # Realizar pesquisa no endpoint unificado SearxNG
     try:
@@ -396,6 +396,6 @@ def search_products_by_type():
             return {"error": "Resposta não é um JSON válido"}
 
 # Endpoint de pesquisa de produtos por tipo
-@app.get("/search_products_by_type/")
+@app.post("/search_products_by_type/")
 def search_products_by_type_endpoint():
     return search_products_by_type()
