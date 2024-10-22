@@ -60,19 +60,19 @@ async def load_balancer_request(data, headers, timeout=30):
 
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
-
     if not products or not isinstance(products, list):
         raise HTTPException(status_code=400, detail="Nenhum produto encontrado para enviar ao assistente.")
-    
+
     try:
         # Criar o thread
         thread = client.beta.threads.create()
 
         # Adicionar mensagens ao thread
+        # Corrigindo o envio do conteúdo para garantir que o formato JSON seja mantido
         message = client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
-            content=f"{products}"
+            content=json.dumps(products)  # Converte a lista para JSON
         )
 
         # Executar o thread com o assistente v2
@@ -82,7 +82,7 @@ def send_products_to_api(products, assistant_id):
         )
 
         # Verificar o status do run até ser concluído
-        timeout = 30
+        timeout = 60  # Aumentar timeout para 60 segundos
         start_time = time.time()
         while run.status != "completed":
             run = client.beta.threads.runs.retrieve(
@@ -99,10 +99,11 @@ def send_products_to_api(products, assistant_id):
         # Extrair as informações da resposta do OpenAI
         result = None
         for message in messages:
-            for content in message.content:
-                if content.text:
-                    result = content.text.value
-                    break
+            if 'content' in message and isinstance(message['content'], list):
+                for content in message['content']:
+                    if 'text' in content and 'value' in content['text']:
+                        result = content['text']['value']
+                        break
             if result:
                 break
 
@@ -111,6 +112,7 @@ def send_products_to_api(products, assistant_id):
 
         # Retornar a última resposta do assistente
         return result
+
     except Exception as e:
         print(f"Erro em send_products_to_api: {e}")
         raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
