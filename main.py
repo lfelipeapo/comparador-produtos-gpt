@@ -59,22 +59,24 @@ async def load_balancer_request(data, headers, timeout=30):
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 # Função para enviar a lista de produtos para a API
-async def send_products_to_api(products, assistant_id):
+def send_products_to_api(products, assistant_id):
+
+    if not products or not isinstance(products, list):
+        raise HTTPException(status_code=400, detail="Nenhum produto encontrado para enviar ao assistente.")
+    
     try:
         # Criar o thread
-        thread = await asyncio.to_thread(client.beta.threads.create)
+        thread = client.beta.threads.create()
 
         # Adicionar mensagens ao thread
-        message = await asyncio.to_thread(
-            client.beta.threads.messages.create,
+        message = client.beta.threads.messages.create(
             thread_id=thread.id,
             role="user",
             content=f"{products}"
         )
 
         # Executar o thread com o assistente v2
-        run = await asyncio.to_thread(
-            client.beta.threads.runs.create,
+        run = client.beta.threads.runs.create(
             thread_id=thread.id,
             assistant_id=assistant_id
         )
@@ -83,20 +85,16 @@ async def send_products_to_api(products, assistant_id):
         timeout = 30
         start_time = time.time()
         while run.status != "completed":
-            run = await asyncio.to_thread(
-                client.beta.threads.runs.retrieve,
+            run = client.beta.threads.runs.retrieve(
                 thread_id=thread.id,
                 run_id=run.id
             )
-            await asyncio.sleep(0.5)
+            time.sleep(0.5)
             if time.time() - start_time > timeout:
                 raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
 
         # Recuperar as mensagens do thread após o run ser completado
-        messages = await asyncio.to_thread(
-            client.beta.threads.messages.list,
-            thread_id=thread.id
-        )
+        messages = client.beta.threads.messages.list(thread_id=thread.id)
 
         # Extrair as informações da resposta do OpenAI
         result = None
@@ -148,8 +146,11 @@ def validate_and_sanitize_product_name(product_name: str):
 async def search_product(request: ProductRequest):
     # Extrair o nome do produto do corpo da requisição
     product_name = request.product_name
+    print(f"Recebendo requisição para produto: {product_name}")
+    
     # Validar e sanitizar o nome do produto
     product_name = validate_and_sanitize_product_name(product_name)
+    print(f"Produto sanitizado: {product_name}")
 
     try:
         data = {
@@ -182,14 +183,18 @@ async def search_product(request: ProductRequest):
         print(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
-    if not search_results or 'results' not in search_results:
+    if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
+        print("Erro: Resposta de pesquisa inválida ou inesperada.")
         raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
 
     try:
         products = search_results.get('results', [])
+        print(f"Produtos obtidos: {products}")
         result = await send_products_to_api(products, ASSISTANT_ID)
+        print(f"Resposta do assistente: {result}")
         return json.loads(result)
     except json.JSONDecodeError:
+        print("Erro ao converter a resposta do assistente para JSON.")
         return {"error": "Resposta do assistente não é um JSON válido."}
     except HTTPException as he:
         raise he
