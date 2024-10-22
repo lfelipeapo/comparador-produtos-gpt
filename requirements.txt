@@ -1,4 +1,6 @@
+backoff
 fastapi
 openai
-requests
+httpx
 uvicorn
+pydantic
