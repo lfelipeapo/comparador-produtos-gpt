@@ -29,6 +29,42 @@ ALLOWED_DOMAINS = os.getenv('ALLOWED_DOMAINS', '').split(',')
 
 app = FastAPI()
 
+@app.post("/generate_token")
+async def generate_token(request: Request):
+    # Configurações para validação
+    SECRET_KEY = os.getenv('SECRET_KEY')
+    ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',')
+    ALLOWED_DOMAINS = os.getenv('ALLOWED_DOMAINS', '').split(',')
+
+    # Validação de IP
+    client_ip = request.client.host
+    if client_ip not in ALLOWED_IPS:
+        raise HTTPException(status_code=403, detail='IP não autorizado!')
+
+    # Validação de Domínio
+    referer = request.headers.get('Referer')
+    if not referer:
+        raise HTTPException(status_code=403, detail='Referer é necessário!')
+
+    domain = referer.split('/')[2]
+    if domain not in ALLOWED_DOMAINS:
+        raise HTTPException(status_code=403, detail='Domínio não autorizado!')
+
+    # Dados para o token JWT
+    payload = {
+        'ip': client_ip,
+        'domain': domain,
+        'exp': time.time() + 3600  # Token expira em 1 hora
+    }
+
+    # Geração do token JWT
+    token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
+
+    # Retornar o token no header da resposta
+    response = JSONResponse(content={'message': 'Token gerado com sucesso!'})
+    response.headers['Authorization'] = f'Bearer {token}'
+    return response
+
 class JWTMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         # Verificação do token JWT
