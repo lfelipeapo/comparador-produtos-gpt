@@ -4,3 +4,4 @@ openai
 httpx
 uvicorn
 pydantic
+pyjwt
