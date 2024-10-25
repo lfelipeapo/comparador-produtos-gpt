@@ -20,7 +20,8 @@ SEARXNG_ENDPOINTS = [
     "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
     "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
-    "https://search-mt-w5r6poyq8ojutb2w.onrender.com"
+    "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
+    "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/"
 ]
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',')
