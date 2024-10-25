@@ -1,3 +1,4 @@
+import jwt
 import os
 import backoff
 import asyncio
@@ -6,11 +7,10 @@ import json
 import html
 import re
 import time
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
-
-app = FastAPI()
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -22,6 +22,43 @@ SEARXNG_ENDPOINTS = [
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
     "https://search-mt-w5r6poyq8ojutb2w.onrender.com"
 ]
+SECRET_KEY = os.getenv('SECRET_KEY')
+ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',')
+ALLOWED_DOMAINS = os.getenv('ALLOWED_DOMAINS', '').split(',')
+
+app = FastAPI()
+
+class JWTMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Verificação do token JWT
+        token = request.headers.get('Authorization')
+        if not token:
+            raise HTTPException(status_code=403, detail='Token é necessário!')
+
+        try:
+            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            raise HTTPException(status_code=403, detail='Token expirado!')
+        except jwt.InvalidTokenError:
+            raise HTTPException(status_code=403, detail='Token inválido!')
+
+        # Validação de IP
+        client_ip = request.client.host
+        if client_ip not in ALLOWED_IPS:
+            raise HTTPException(status_code=403, detail='IP não autorizado!')
+
+        # Validação de Domínio
+        referer = request.headers.get('Referer')
+        if referer:
+            domain = referer.split('/')[2]
+            if domain not in ALLOWED_DOMAINS:
+                raise HTTPException(status_code=403, detail='Domínio não autorizado!')
+
+        response = await call_next(request)
+        return response
+
+# Adiciona o middleware à aplicação
+app.add_middleware(JWTMiddleware)
 
 # Verifique se as variáveis de ambiente estão definidas
 missing_vars = []
