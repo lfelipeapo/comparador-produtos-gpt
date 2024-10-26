@@ -8,6 +8,7 @@ import html
 import re
 import time
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
