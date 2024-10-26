@@ -31,24 +31,14 @@ app = FastAPI()
 
 @app.post("/generate_token")
 async def generate_token(request: Request):
-    # Configurações para validação
-    SECRET_KEY = os.getenv('SECRET_KEY')
-    ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',')
-    ALLOWED_DOMAINS = os.getenv('ALLOWED_DOMAINS', '').split(',')
-
-    # Validação de IP
+    # Validação de IP e Domínio
     client_ip = request.client.host
-    if client_ip not in ALLOWED_IPS:
-        raise HTTPException(status_code=403, detail='IP não autorizado!')
-
-    # Validação de Domínio
     referer = request.headers.get('Referer')
-    if not referer:
-        raise HTTPException(status_code=403, detail='Referer é necessário!')
+    domain = referer.split('/')[2] if referer else None
 
-    domain = referer.split('/')[2]
-    if domain not in ALLOWED_DOMAINS:
-        raise HTTPException(status_code=403, detail='Domínio não autorizado!')
+    # Se o IP ou o Domínio estiver permitido, passa. Caso contrário, bloqueia.
+    if client_ip not in ALLOWED_IPS and (domain is None or domain not in ALLOWED_DOMAINS):
+        raise HTTPException(status_code=403, detail='Acesso negado: IP ou Domínio não autorizado!')
 
     # Dados para o token JWT
     payload = {
@@ -83,17 +73,14 @@ class JWTMiddleware(BaseHTTPMiddleware):
         except jwt.InvalidTokenError:
             raise HTTPException(status_code=403, detail='Token inválido!')
 
-        # Validação de IP
+        # Validação de IP e Domínio
         client_ip = request.client.host
-        if client_ip not in ALLOWED_IPS:
-            raise HTTPException(status_code=403, detail='IP não autorizado!')
-
-        # Validação de Domínio
         referer = request.headers.get('Referer')
-        if referer:
-            domain = referer.split('/')[2]
-            if domain not in ALLOWED_DOMAINS:
-                raise HTTPException(status_code=403, detail='Domínio não autorizado!')
+        domain = referer.split('/')[2] if referer else None
+
+        # Se o IP ou o Domínio estiver permitido, passa. Caso contrário, bloqueia.
+        if client_ip not in ALLOWED_IPS and (domain is None or domain not in ALLOWED_DOMAINS):
+            raise HTTPException(status_code=403, detail='Acesso negado: IP ou Domínio não autorizado!')
 
         response = await call_next(request)
         return response
