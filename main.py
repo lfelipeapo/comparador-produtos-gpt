@@ -114,12 +114,29 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 class ProductRequest(BaseModel):
     product_name: str
 
-# Função de balanceamento de carga e failover para requisição HTTP
+@backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
+async def get_token_from_endpoint(endpoint):
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(f"{endpoint}/generate_token")
+            if response.status_code == 200 and "Authorization" in response.headers:
+                token = response.headers["Authorization"]
+                return token
+            else:
+                print(f"Erro ao obter token de {endpoint}: {response.status_code}")
+                raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
+    except httpx.RequestError as e:
+        print(f"Erro ao conectar ao endpoint {endpoint} para token: {e}")
+        raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(data, headers, timeout=30):
     for endpoint in SEARXNG_ENDPOINTS:
         try:
+            # Obter o token antes de fazer a requisição
+            token = await get_token_from_endpoint(endpoint)
+            headers["Authorization"] = token
+            
             async with httpx.AsyncClient() as client_http:
                 response = await client_http.post(
                     f"{endpoint}/search",
