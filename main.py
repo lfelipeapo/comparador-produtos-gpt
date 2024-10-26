@@ -34,7 +34,7 @@ async def generate_token(request: Request):
     # Validação de IP e Domínio
     client_ip = request.client.host
     referer = request.headers.get('Referer')
-    domain = referer.split('/')[2] if referer else None
+    domain = referer.split('/')[2] if referer and len(referer.split('/')) > 2 else None
 
     # Se o IP ou o Domínio estiver permitido, passa. Caso contrário, bloqueia.
     if client_ip not in ALLOWED_IPS and (domain is None or domain not in ALLOWED_DOMAINS):
@@ -76,8 +76,8 @@ class JWTMiddleware(BaseHTTPMiddleware):
         # Validação de IP e Domínio
         client_ip = request.client.host
         referer = request.headers.get('Referer')
-        domain = referer.split('/')[2] if referer else None
-
+        domain = referer.split('/')[2] if referer and len(referer.split('/')) > 2 else None
+        
         # Se o IP ou o Domínio estiver permitido, passa. Caso contrário, bloqueia.
         if client_ip not in ALLOWED_IPS and (domain is None or domain not in ALLOWED_DOMAINS):
             raise HTTPException(status_code=403, detail='Acesso negado: IP ou Domínio não autorizado!')
