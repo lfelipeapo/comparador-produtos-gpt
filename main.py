@@ -18,11 +18,11 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_ENDPOINTS = [
-    "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
-    "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
-    "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
-    "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
     "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/"
+    "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
+    # "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
+    # "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
+    # "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
 ]
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALLOWED_IPS = os.getenv('ALLOWED_IPS', '').split(',')
@@ -282,332 +282,332 @@ async def search_product(request: ProductRequest):
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
 
 # Função auxiliar para buscar produtos por tipo
-# async def fetch_product_type(product_type):
-#     try:
-#         headers = {
-#             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-#                           "AppleWebKit/537.36 (KHTML, like Gecko) "
-#                           "Chrome/58.0.3029.110 Safari/537.3",
-#             "Accept": "application/json",
-#             "Accept-Encoding": "gzip, deflate",
-#             "Connection": "keep-alive"
-#         }
-#         data = {
-#             "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
-#             "format": "json"
-#         }
-#         search_response = await load_balancer_request(data, headers)
-#         # Verifica se o status da resposta é 200 (OK)
-#         if search_response.status_code != 200:
-#             return (product_type, {"error": "Falha na pesquisa."})
-#         # Tenta fazer o parsing do JSON
-#         search_results = search_response.json()
-#         products = search_results.get('results', [])
-#         return (product_type, products)
-#     except httpx.RequestError as e:
-#         print(f"Erro ao conectar ao serviço de pesquisa para o tipo {product_type}: {e}")
-#         return (product_type, {"error": "Falha na pesquisa."})
-#     except json.JSONDecodeError:
-#         return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
-#     except Exception as e:
-#         print(f"Erro inesperado ao buscar o tipo {product_type}: {e}")
-#         return (product_type, {"error": "Falha na pesquisa."})
+async def fetch_product_type(product_type):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/58.0.3029.110 Safari/537.3",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
+        }
+        data = {
+            "q": f"{product_type} (site:zoom.com.br OR site:buscape.com.br)",
+            "format": "json"
+        }
+        search_response = await load_balancer_request(data, headers)
+        # Verifica se o status da resposta é 200 (OK)
+        if search_response.status_code != 200:
+            return (product_type, {"error": "Falha na pesquisa."})
+        # Tenta fazer o parsing do JSON
+        search_results = search_response.json()
+        products = search_results.get('results', [])
+        return (product_type, products)
+    except httpx.RequestError as e:
+        print(f"Erro ao conectar ao serviço de pesquisa para o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
+    except json.JSONDecodeError:
+        return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
+    except Exception as e:
+        print(f"Erro inesperado ao buscar o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
         
 # Função para pesquisar produtos por tipo
-# async def search_products_by_type():
-#     # Lista de tipos de produtos (mantida sem alterações)
-#     product_types = [
-#         "geladeira",
-#         "fogão",
-#         "micro-ondas",
-#         "lava-louças",
-#         "máquina de lavar roupa",
-#         "secadora de roupas",
-#         "aspirador de pó",
-#         "air fryer",
-#         "cafeteira",
-#         "torradeira",
-#         "liquidificador",
-#         "batedeira",
-#         "ferro de passar",
-#         "purificador de água",
-#         "ar-condicionado",
-#         "ventilador",
-#         "aquecedor",
-#         "panela elétrica",
-#         "grill elétrico",
-#         "forno elétrico",
-#         "sanduicheira",
-#         "fritadeira elétrica",
-#         "processador de alimentos",
-#         "coifa",
-#         "exaustor",
-#         "máquina de gelo",
-#         "adega climatizada",
-#         "máquina de costura",
-#         "lavadora de alta pressão",
-#         "cortador de grama",
-#         "triturador de alimentos",
-#         "fogão cooktop",
-#         "forno a gás",
-#         "bebedouro",
-#         "desumidificador",
-#         "umidificador",
-#         "aspirador robô",
-#         "chaleira elétrica",
-#         "espremedor de frutas",
-#         "sorveteira",
-#         "panela de arroz",
-#         "panela de pressão elétrica",
-#         "máquina de pão",
-#         "mopa a vapor",
-#         "purificador de ar",
-#         "cervejeira",
-#         "massageador",
-#         "máquina de crepe",
-#         "máquina de waffles",
-#         "forno elétrico de embutir",
-#         "sofá",
-#         "cama",
-#         "mesa de jantar",
-#         "cadeira",
-#         "guarda-roupa",
-#         "escrivaninha",
-#         "estante",
-#         "rack para TV",
-#         "mesa de centro",
-#         "poltrona",
-#         "colchão",
-#         "criado-mudo",
-#         "aparador",
-#         "penteadeira",
-#         "banqueta",
-#         "beliche",
-#         "painel para TV",
-#         "cabeceira",
-#         "cômoda",
-#         "mesa de escritório",
-#         "estante de livros",
-#         "sapateira",
-#         "buffet",
-#         "cristaleira",
-#         "divã",
-#         "camiseta",
-#         "calça jeans",
-#         "tênis",
-#         "bota",
-#         "bolsa",
-#         "relógio",
-#         "óculos de sol",
-#         "vestido",
-#         "saia",
-#         "camisa social",
-#         "jaqueta",
-#         "moletom",
-#         "blazer",
-#         "gravata",
-#         "brincos",
-#         "colar",
-#         "pulseira",
-#         "meia",
-#         "cueca",
-#         "sutiã",
-#         "boné",
-#         "chinelo",
-#         "cinto",
-#         "luvas",
-#         "cachecol",
-#         "perfume",
-#         "maquiagem",
-#         "shampoo",
-#         "condicionador",
-#         "creme hidratante",
-#         "protetor solar",
-#         "escova de dentes elétrica",
-#         "secador de cabelo",
-#         "chapinha",
-#         "barbeador elétrico",
-#         "aparador de pelos",
-#         "esfoliante",
-#         "sabonete líquido",
-#         "máscara facial",
-#         "kit manicure",
-#         "depilador elétrico",
-#         "lixa elétrica",
-#         "hidratante corporal",
-#         "kit de pincéis de maquiagem",
-#         "pinça",
-#         "creme anti-idade",
-#         "serum facial",
-#         "loção pós-barba",
-#         "tônico facial",
-#         "base para maquiagem",
-#         "bicicleta",
-#         "esteira",
-#         "roupas de ginástica",
-#         "halteres",
-#         "tênis de corrida",
-#         "bola de futebol",
-#         "skate",
-#         "patins",
-#         "suplementos alimentares",
-#         "tapete de yoga",
-#         "bicicleta ergométrica",
-#         "elíptico",
-#         "luvas de boxe",
-#         "barras de flexão",
-#         "corda de pular",
-#         "banco de musculação",
-#         "faixas elásticas",
-#         "step",
-#         "bola de pilates",
-#         "kettlebell",
-#         "roupas de natação",
-#         "mochila de hidratação",
-#         "gorro de natação",
-#         "óculos de natação",
-#         "acessórios para bicicleta",
-#         "smartphone",
-#         "notebook",
-#         "tablet",
-#         "smart TV",
-#         "headphone",
-#         "smartwatch",
-#         "câmera digital",
-#         "console de videogame",
-#         "caixa de som Bluetooth",
-#         "home theater",
-#         "projetor",
-#         "fone de ouvido sem fio",
-#         "monitor",
-#         "disco rígido externo",
-#         "impressora",
-#         "roteador",
-#         "mouse gamer",
-#         "teclado",
-#         "headset gamer",
-#         "placa de vídeo",
-#         "memória RAM",
-#         "SSD",
-#         "HD interno",
-#         "microfone",
-#         "leitor de e-book",
-#         "controle remoto universal",
-#         "antena digital",
-#         "estabilizador",
-#         "nobreak",
-#         "câmera de segurança",
-#         "drone",
-#         "power bank",
-#         "Chromecast",
-#         "Apple TV",
-#         "pen drive",
-#         "carregador de celular",
-#         "cabo HDMI",
-#         "suporte para TV",
-#         "adaptador USB",
-#         "carregador sem fio",
-#         "câmera instantânea",
-#         "fone com cancelamento de ruído",
-#         "placa-mãe",
-#         "processador",
-#         "kit de ferramentas eletrônicas",
-#         "leitor de cartão de memória",
-#         "lente para câmera",
-#         "flash para câmera",
-#         "livros",
-#         "DVDs",
-#         "blu-rays",
-#         "e-books",
-#         "CDs de música",
-#         "revistas",
-#         "áudiolivros",
-#         "quadrinhos",
-#         "mangás",
-#         "box de séries",
-#         "box de filmes",
-#         "enciclopédias",
-#         "mapas",
-#         "calendários",
-#         "agendas",
-#         "boneca",
-#         "carrinho de controle remoto",
-#         "quebra-cabeça",
-#         "Lego",
-#         "jogos de tabuleiro",
-#         "videogames",
-#         "bonecos de ação",
-#         "pelúcia",
-#         "drones infantis",
-#         "massinha de modelar",
-#         "brinquedos educativos",
-#         "blocos de montar",
-#         "patinete",
-#         "triciclo",
-#         "piscina de bolinhas",
-#         "casa de bonecas",
-#         "carrinho de bebê de brinquedo",
-#         "instrumentos musicais infantis",
-#         "jogo de dardos",
-#         "pista de carrinhos",
-#         "castelo inflável",
-#         "bolas esportivas",
-#         "fantasias",
-#         "jogos de cartas",
-#         "kit de mágica",
-#         "pneus",
-#         "GPS automotivo",
-#         "som automotivo",
-#         "suporte veicular para celular",
-#         "capa de volante",
-#         "tapetes para carro",
-#         "câmera de ré",
-#         "kit de primeiros socorros para carro",
-#         "carregador veicular",
-#         "aspirador de pó automotivo",
-#         "ração para pets",
-#         "coleira",
-#         "casinha para pets",
-#         "brinquedos para pets",
-#         "caixa de transporte",
-#         "arranhador",
-#         "comedouro automático",
-#         "aquário",
-#         "areia higiênica",
-#         "bebedouro para pets"
-#     ]
+async def search_products_by_type():
+    # Lista de tipos de produtos (mantida sem alterações)
+    product_types = [
+        "geladeira",
+        "fogão",
+        "micro-ondas",
+        "lava-louças",
+        "máquina de lavar roupa",
+        "secadora de roupas",
+        "aspirador de pó",
+        "air fryer",
+        "cafeteira",
+        "torradeira",
+        "liquidificador",
+        "batedeira",
+        "ferro de passar",
+        "purificador de água",
+        "ar-condicionado",
+        "ventilador",
+        "aquecedor",
+        "panela elétrica",
+        "grill elétrico",
+        "forno elétrico",
+        "sanduicheira",
+        "fritadeira elétrica",
+        "processador de alimentos",
+        "coifa",
+        "exaustor",
+        "máquina de gelo",
+        "adega climatizada",
+        "máquina de costura",
+        "lavadora de alta pressão",
+        "cortador de grama",
+        "triturador de alimentos",
+        "fogão cooktop",
+        "forno a gás",
+        "bebedouro",
+        "desumidificador",
+        "umidificador",
+        "aspirador robô",
+        "chaleira elétrica",
+        "espremedor de frutas",
+        "sorveteira",
+        "panela de arroz",
+        "panela de pressão elétrica",
+        "máquina de pão",
+        "mopa a vapor",
+        "purificador de ar",
+        "cervejeira",
+        "massageador",
+        "máquina de crepe",
+        "máquina de waffles",
+        "forno elétrico de embutir",
+        "sofá",
+        "cama",
+        "mesa de jantar",
+        "cadeira",
+        "guarda-roupa",
+        "escrivaninha",
+        "estante",
+        "rack para TV",
+        "mesa de centro",
+        "poltrona",
+        "colchão",
+        "criado-mudo",
+        "aparador",
+        "penteadeira",
+        "banqueta",
+        "beliche",
+        "painel para TV",
+        "cabeceira",
+        "cômoda",
+        "mesa de escritório",
+        "estante de livros",
+        "sapateira",
+        "buffet",
+        "cristaleira",
+        "divã",
+        "camiseta",
+        "calça jeans",
+        "tênis",
+        "bota",
+        "bolsa",
+        "relógio",
+        "óculos de sol",
+        "vestido",
+        "saia",
+        "camisa social",
+        "jaqueta",
+        "moletom",
+        "blazer",
+        "gravata",
+        "brincos",
+        "colar",
+        "pulseira",
+        "meia",
+        "cueca",
+        "sutiã",
+        "boné",
+        "chinelo",
+        "cinto",
+        "luvas",
+        "cachecol",
+        "perfume",
+        "maquiagem",
+        "shampoo",
+        "condicionador",
+        "creme hidratante",
+        "protetor solar",
+        "escova de dentes elétrica",
+        "secador de cabelo",
+        "chapinha",
+        "barbeador elétrico",
+        "aparador de pelos",
+        "esfoliante",
+        "sabonete líquido",
+        "máscara facial",
+        "kit manicure",
+        "depilador elétrico",
+        "lixa elétrica",
+        "hidratante corporal",
+        "kit de pincéis de maquiagem",
+        "pinça",
+        "creme anti-idade",
+        "serum facial",
+        "loção pós-barba",
+        "tônico facial",
+        "base para maquiagem",
+        "bicicleta",
+        "esteira",
+        "roupas de ginástica",
+        "halteres",
+        "tênis de corrida",
+        "bola de futebol",
+        "skate",
+        "patins",
+        "suplementos alimentares",
+        "tapete de yoga",
+        "bicicleta ergométrica",
+        "elíptico",
+        "luvas de boxe",
+        "barras de flexão",
+        "corda de pular",
+        "banco de musculação",
+        "faixas elásticas",
+        "step",
+        "bola de pilates",
+        "kettlebell",
+        "roupas de natação",
+        "mochila de hidratação",
+        "gorro de natação",
+        "óculos de natação",
+        "acessórios para bicicleta",
+        "smartphone",
+        "notebook",
+        "tablet",
+        "smart TV",
+        "headphone",
+        "smartwatch",
+        "câmera digital",
+        "console de videogame",
+        "caixa de som Bluetooth",
+        "home theater",
+        "projetor",
+        "fone de ouvido sem fio",
+        "monitor",
+        "disco rígido externo",
+        "impressora",
+        "roteador",
+        "mouse gamer",
+        "teclado",
+        "headset gamer",
+        "placa de vídeo",
+        "memória RAM",
+        "SSD",
+        "HD interno",
+        "microfone",
+        "leitor de e-book",
+        "controle remoto universal",
+        "antena digital",
+        "estabilizador",
+        "nobreak",
+        "câmera de segurança",
+        "drone",
+        "power bank",
+        "Chromecast",
+        "Apple TV",
+        "pen drive",
+        "carregador de celular",
+        "cabo HDMI",
+        "suporte para TV",
+        "adaptador USB",
+        "carregador sem fio",
+        "câmera instantânea",
+        "fone com cancelamento de ruído",
+        "placa-mãe",
+        "processador",
+        "kit de ferramentas eletrônicas",
+        "leitor de cartão de memória",
+        "lente para câmera",
+        "flash para câmera",
+        "livros",
+        "DVDs",
+        "blu-rays",
+        "e-books",
+        "CDs de música",
+        "revistas",
+        "áudiolivros",
+        "quadrinhos",
+        "mangás",
+        "box de séries",
+        "box de filmes",
+        "enciclopédias",
+        "mapas",
+        "calendários",
+        "agendas",
+        "boneca",
+        "carrinho de controle remoto",
+        "quebra-cabeça",
+        "Lego",
+        "jogos de tabuleiro",
+        "videogames",
+        "bonecos de ação",
+        "pelúcia",
+        "drones infantis",
+        "massinha de modelar",
+        "brinquedos educativos",
+        "blocos de montar",
+        "patinete",
+        "triciclo",
+        "piscina de bolinhas",
+        "casa de bonecas",
+        "carrinho de bebê de brinquedo",
+        "instrumentos musicais infantis",
+        "jogo de dardos",
+        "pista de carrinhos",
+        "castelo inflável",
+        "bolas esportivas",
+        "fantasias",
+        "jogos de cartas",
+        "kit de mágica",
+        "pneus",
+        "GPS automotivo",
+        "som automotivo",
+        "suporte veicular para celular",
+        "capa de volante",
+        "tapetes para carro",
+        "câmera de ré",
+        "kit de primeiros socorros para carro",
+        "carregador veicular",
+        "aspirador de pó automotivo",
+        "ração para pets",
+        "coleira",
+        "casinha para pets",
+        "brinquedos para pets",
+        "caixa de transporte",
+        "arranhador",
+        "comedouro automático",
+        "aquário",
+        "areia higiênica",
+        "bebedouro para pets"
+    ]
 
-#     # Dicionário para armazenar os resultados
-#     results = {}
+    # Dicionário para armazenar os resultados
+    results = {}
 
-#     # Pesquisar produtos por tipo
-#     tasks = [fetch_product_type(product_type) for product_type in product_types]
-#     responses = await asyncio.gather(*tasks)
-#     results = dict(responses)
+    # Pesquisar produtos por tipo
+    tasks = [fetch_product_type(product_type) for product_type in product_types]
+    responses = await asyncio.gather(*tasks)
+    results = dict(responses)
 
-#     # Enviar a lista de produtos para a API
-#     try:
-#         result = send_products_to_api(results, ASSISTANT_ID_GROUP)
-#     except HTTPException as he:
-#         raise he
-#     except Exception as e:
-#         print(f"Erro ao enviar produtos para a API do assistente: {e}")
-#         raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
+    # Enviar a lista de produtos para a API
+    try:
+        result = send_products_to_api(results, ASSISTANT_ID_GROUP)
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Erro ao enviar produtos para a API do assistente: {e}")
+        raise HTTPException(status_code=500, detail="Erro ao enviar produtos para a API do assistente.")
 
-#     # Verificar se a resposta é vazia ou não é um JSON válido
-#     if not result:
-#         return {"error": "Resposta vazia ou não é um JSON válido."}
-#     else:
-#         try:
-#             # Retornar a resposta em formato JSON
-#             return json.loads(result)
-#         except json.JSONDecodeError:
-#             return {"error": "Resposta do assistente não é um JSON válido."}
+    # Verificar se a resposta é vazia ou não é um JSON válido
+    if not result:
+        return {"error": "Resposta vazia ou não é um JSON válido."}
+    else:
+        try:
+            # Retornar a resposta em formato JSON
+            return json.loads(result)
+        except json.JSONDecodeError:
+            return {"error": "Resposta do assistente não é um JSON válido."}
 
 # Endpoint de pesquisa de produtos por tipo
-# @app.post("/search_products_by_type/")
-# async def search_products_by_type_endpoint():
-#     return await search_products_by_type()
+@app.post("/search_products_by_type/")
+async def search_products_by_type_endpoint():
+    return await search_products_by_type()
 
 # Endpoint de saúde para verificação rápida
 @app.get("/health")
