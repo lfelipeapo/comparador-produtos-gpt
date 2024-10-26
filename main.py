@@ -71,7 +71,8 @@ class JWTMiddleware(BaseHTTPMiddleware):
             jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         except jwt.ExpiredSignatureError:
             raise HTTPException(status_code=403, detail='Token expirado!')
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            print(f"Erro de token JWT: {e}")
             raise HTTPException(status_code=403, detail='Token inválido!')
 
         # Validação de IP e Domínio
