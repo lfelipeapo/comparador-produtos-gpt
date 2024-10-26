@@ -67,6 +67,10 @@ async def generate_token(request: Request):
 
 class JWTMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
+        # Ignorar validação para a rota /generate_token
+        if request.url.path == "/generate_token":
+            return await call_next(request)
+
         # Verificação do token JWT
         token = request.headers.get('Authorization')
         if not token:
