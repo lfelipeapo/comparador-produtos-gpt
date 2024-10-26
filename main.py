@@ -64,6 +64,10 @@ class JWTMiddleware(BaseHTTPMiddleware):
 
         # Verificação do token JWT
         token = request.headers.get('Authorization')
+        
+        if token and token.startswith("Bearer "):
+            token = token.split(" ")[1]
+            
         if not token:
             raise HTTPException(status_code=403, detail='Token é necessário!')
 
