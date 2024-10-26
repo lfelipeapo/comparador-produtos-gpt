@@ -271,15 +271,22 @@ async def search_product(request: ProductRequest):
         print(f"Produtos obtidos: {products}")
         result = send_products_to_api(products, ASSISTANT_ID_GROUP)
         print(f"Resposta do assistente: {result}")
-        return json.loads(result)
-    except json.JSONDecodeError:
-        print("Erro ao converter a resposta do assistente para JSON.")
-        return {"error": "Resposta do assistente não é um JSON válido."}
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Erro ao processar a resposta do assistente: {e}")
-        return {"error": f"Erro ao processar a resposta do assistente: {e}"}
+
+        # Tente carregar o JSON diretamente da resposta
+        if isinstance(result, str):
+            result = json.loads(result)
+        elif isinstance(result, dict):
+            pass  # Result já está em formato de dicionário
+        else:
+            raise ValueError("Formato da resposta inesperado")
+
+    return result
+except json.JSONDecodeError as e:
+    print(f"Erro ao converter a resposta do assistente para JSON: {e}")
+    return {"error": "Resposta do assistente não é um JSON válido."}
+except ValueError as ve:
+    print(f"Erro de formato na resposta do assistente: {ve}")
+    return {"error": "Formato da resposta do assistente é inesperado."}
 
 # Função auxiliar para buscar produtos por tipo
 async def fetch_product_type(product_type):
