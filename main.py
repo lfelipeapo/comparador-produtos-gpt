@@ -149,7 +149,16 @@ async def load_balancer_request(data, headers, timeout=30):
 
 def verifica_engines_nao_responsivas(search_response):
     unresponsive = search_response.get('unresponsive_engines', [])
-    motores_suspensos = [motor for motor, mensagem in unresponsive if 'acesso negado' in mensagem.lower()]
+    # Verifica se tanto 'buscape' quanto 'zoom' estão na mesma mensagem de erro
+    motores_suspensos = []
+    for motor, mensagem in unresponsive:
+        if 'acesso negado' in mensagem.lower():
+            motores_suspensos.append(motor)
+    
+    # Confirma se ambos os motores estão suspensos
+    if 'buscape' in motores_suspensos and 'zoom' in motores_suspensos:
+        return ['buscape', 'zoom']
+    
     return motores_suspensos
 
 def gerar_prompt_alternativo(product_name):
