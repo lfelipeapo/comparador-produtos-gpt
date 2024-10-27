@@ -303,7 +303,7 @@ async def fetch_product_type(product_type):
             "Connection": "keep-alive"
         }
         data = {
-            "q": f"{product_name}",
+            "q": product_type,
             "format": "json",
             "engines": "buscape,zoom"
         }
