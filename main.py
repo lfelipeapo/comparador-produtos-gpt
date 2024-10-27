@@ -273,7 +273,7 @@ def send_products_to_api(products, assistant_id):
 
 def validate_and_sanitize_product_name(product_name: str):
     # Validar se existe nome de produto
-    if len(product_name.strip()) == 0:
+    if not isinstance(product_name, str) or len(product_name.strip()) == 0:
         raise HTTPException(status_code=400, detail="Nome de produto não informado.")
 
     # Limitar o tamanho do nome do produto para evitar ataques de buffer overflow
