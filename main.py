@@ -295,14 +295,13 @@ async def search_product(request: ProductRequest):
     # Verificação de motores não responsivos
     motores_suspensos = verifica_engines_nao_responsivas(search_results)
 
-    if motores_suspensos:
+    if motores_suspensos == ['buscape', 'zoom']:
         print(f"Motores suspensos detectados: {motores_suspensos}")
         # Utiliza o prompt alternativo se os motores principais estiverem suspensos
         prompt_alternativo = gerar_prompt_alternativo(product_name)
         data_alternativo = {
             "q": prompt_alternativo,
             "format": "json",
-            "engines": "google,mercadolivre,amazon,magazineluiza,casasbahia,americanas"
         }
         try:
             search_response_alternativo = await load_balancer_request(data_alternativo, headers)
