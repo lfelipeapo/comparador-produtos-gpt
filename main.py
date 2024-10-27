@@ -222,7 +222,6 @@ def send_products_to_api(products, assistant_id):
     # Retornar a última resposta do assistente
     return result
 
-# Função para validar e sanitizar a entrada do nome do produto
 def validate_and_sanitize_product_name(product_name: str):
     # Validar se existe nome de produto
     if len(product_name.strip()) == 0:
@@ -235,8 +234,8 @@ def validate_and_sanitize_product_name(product_name: str):
     # Sanitização básica contra XSS
     product_name = html.escape(product_name)
 
-    # Expressão regular para permitir apenas letras, números, espaço, e alguns símbolos seguros (- e _)
-    if not re.match(r"^[a-zA-Z0-9 _-]+$", product_name):
+    # Expressão regular para permitir letras, números, espaço, hífen, sublinhado e caracteres acentuados
+    if not re.match(r"^[a-zA-Z0-9 _-çáéíóúâêîôûãõàèìòùäëïöüñÇÁÉÍÓÚÂÊÎÔÛÃÕÀÈÌÒÙÄËÏÖÜÑ]+$", product_name):
         raise HTTPException(status_code=400, detail="Nome do produto contém caracteres inválidos.")
 
     # Prevenção contra SQL injection: restrição simplificada apenas para os termos críticos
@@ -326,7 +325,9 @@ async def search_product(request: ProductRequest):
             raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
 
     try:
-        products = search_results.get('results', [])
+        products = search_results.get('results', {})
+        if not isinstance(products, dict):
+            products = {}
         print(f"Produtos obtidos: {products}")
         if not products:
             raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
