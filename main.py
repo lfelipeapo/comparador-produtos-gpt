@@ -251,7 +251,7 @@ async def search_product(request: ProductRequest):
 
     # Enviar resposta para a API
     try:
-        result = send_products_to_api(products)
+        result = send_products_to_api(products, ASSISTANT_ID_GROUP)
         return result
     except json.JSONDecodeError:
         return {"error": "JSON inválido na resposta do assistente"}
