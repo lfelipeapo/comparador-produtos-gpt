@@ -19,7 +19,7 @@ OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
 ASSISTANT_ID = os.environ.get('ASSISTANT_ID')
 ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_ENDPOINTS = [
-    "https://searxng-5scs.onrender.com",
+    "https://marine-cougar-lipe-7c0433f9.koyeb.app/",
     "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/",
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
     # "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
