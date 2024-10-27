@@ -163,7 +163,7 @@ def gerar_prompt_alternativo(product_name):
         "site:americanas.com.br",
         "site:amazon.com.br"
     ])
-    return f"{product_name} +R$ +preço ({sites}) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."-inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
+    return f"{product_name} +R$ +preço ({sites}) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
 
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
