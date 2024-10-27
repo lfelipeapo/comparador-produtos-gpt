@@ -170,10 +170,54 @@ def gerar_prompt_alternativo(product_name):
         "site:magazineluiza.com.br",
         "site:casasbahia.com.br",
         "site:americanas.com.br",
-        "site:amazon.com.br"
+        "site:amazon.com.br",
+        "site:shoptime.com.br",
+        "site:polishop.com.br",
+        "site:koerich.com.br",
+        "site:kabum.com.br",
+        "site:extra.com.br",
+        "site:pontofrio.com.br",
+        "site:berlanda.com.br",
+        "site:lojasmm.com",
+        "site:continentalbrasil.com.br",
+        "site:loja.electrolux.com.br",
+        "site:consul.com.br",
+        "site:brastemp.com.br",
+        "site:havan.com.br",
+        "site:compracerta.com.br",
+        "site:madeiramadeira.com.br",
+        "site:pernambucanas.com.br",
+        "site:colombo.com.br",
+        "site:ricardoeletro.com.br",
+        "site:riachuelo.com.br",
+        "site:marisa.com.br",
+        "site:lojasrenner.com.br",
+        "site:posthaus.com.br",
+        "site:arezzo.com.br",
+        "site:cea.com.br",
+        "site:vestcasa.com.br",
+        "site:wtennis.com.br",
+        "site:milium.com.br",
+        "site:lebiscuit.com.br",
+        "site:benoit.com.br",
+        "site:lojasemporio.com.br",
+        "site:samsung.com/br"
+        "site:dell.com/pt-br",
+        "site:zattini.com.br",
+        "site:dafiti.com.br",
+        "site:netshoes.com.br",
+        "site:natura.com.br",
+        "site:cacaushow.com.br"
+        "site:boticario.com.br",
+        "site:tupperware.com.br"
+        "site:brasilcacau.com.br",
+        "site:motorola.com.br",
+        "site:adidas.com.br",
+        "site:vivara.com.br"
     ])
+    
+    # Retorna o prompt formatado
     return fr"{product_name} +R$ +preco ({sites}) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
-
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
     # Criar o thread
