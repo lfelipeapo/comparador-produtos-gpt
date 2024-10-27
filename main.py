@@ -136,7 +136,8 @@ async def get_token():
         raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
-async def load_balancer_request(data, headers, timeout=30):
+@backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
+async def load_balancer_request(params, headers, timeout=30):
     token = await get_token()
     headers["Authorization"] = token
 
@@ -145,7 +146,7 @@ async def load_balancer_request(data, headers, timeout=30):
             async with httpx.AsyncClient() as client_http:
                 response = await client_http.post(
                     f"{endpoint}/search",
-                    json=data,  # Utilizar JSON em vez de data para payload
+                    params=params,
                     headers=headers,
                     timeout=timeout
                 )
@@ -159,7 +160,7 @@ async def load_balancer_request(data, headers, timeout=30):
             continue  # Tenta o próximo endpoint
 
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
-
+    
 def send_products_to_api(products, assistant_id):
     thread = client_openai.beta.threads.create()
 
@@ -492,8 +493,9 @@ async def search_products_by_type_endpoint():
         print(f"Processando tipo de produto: {sanitized_type}")
 
         data = {
-            "q": f"{sanitized_type} (site:zoom.com.br OR site:buscape.com.br)",
-            "format": "json"
+            "q": sanitized_type,
+            "format": "json",
+            "engines": "buscape,zoom"
         }
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -563,7 +565,7 @@ async def search_product(request: ProductRequest):
 
     try:
         data = {
-            "q": f"{product_name}",
+            "q": product_name,
             "format": "json",
             "engines": "buscape,zoom"
         }
