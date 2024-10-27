@@ -147,6 +147,13 @@ async def load_balancer_request(data, headers, timeout=30):
             print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
+def verifica_engines_nao_responsivas(search_response):
+    unresponsive = search_response.get('unresponsive_engines', [])
+    motores_suspensos = [motor for motor, mensagem in unresponsive if 'acesso negado' in mensagem.lower()]
+    return motores_suspensos
+def gerar_prompt_alternativo(product_name):
+    return f"{product_name} +R$ +preço site:(google.com/shopping OR mercadolivre.com.br OR buscape.com.br OR zoom.com.br OR magazineluiza.com.br OR casasbahia.com.br OR americanas.com.br OR amazon.com.br) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
+
 # Função para enviar a lista de produtos para a API
 def send_products_to_api(products, assistant_id):
     # Criar o thread
@@ -234,7 +241,7 @@ async def search_product(request: ProductRequest):
 
     try:
         data = {
-            "q": f"{product_name}",
+            "q": product_name,
             "format": "json",
             "engines": "buscape,zoom"
         }
@@ -267,6 +274,33 @@ async def search_product(request: ProductRequest):
     if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
         print("Erro: Resposta de pesquisa inválida ou inesperada.")
         raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
+
+    # Verificação de motores não responsivos
+    motores_suspensos = verifica_engines_nao_responsivas(search_results)
+
+    if motores_suspensos:
+        print(f"Motores suspensos detectados: {motores_suspensos}")
+        # Utiliza o prompt alternativo se os motores principais estiverem suspensos
+        prompt_alternativo = gerar_prompt_alternativo(product_name)
+        data_alternativo = {
+            "q": prompt_alternativo,
+            "format": "json",
+            "engines": "google,mercadolivre,amazonia,magazineluiza,casa_bahia,americanas"
+        }
+        try:
+            search_response_alternativo = await load_balancer_request(data_alternativo, headers)
+            if search_response_alternativo.status_code != 200:
+                raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
+
+            search_results = search_response_alternativo.json()
+        except httpx.RequestError as e:
+            print(f"Erro ao conectar ao serviço de pesquisa alternativo: {e}")
+            raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa alternativo.")
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa alternativo não é um JSON válido.")
+        except Exception as e:
+            print(f"Erro inesperado na pesquisa alternativa: {e}")
+            raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
 
     try:
         products = search_results.get('results', [])
