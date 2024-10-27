@@ -6,6 +6,7 @@ import httpx
 import json
 import html
 import re
+import random
 import time
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
@@ -35,6 +36,52 @@ global_token = {
     "token": None,
     "expires_at": 0
 }
+
+def generate_random_headers():
+    user_agents = [
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+        "Mozilla/5.0 (iPad; CPU OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15A5341f Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 11; SM-G998B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/88.0.4324.93 Mobile Safari/537.36",
+        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+        # Adicione mais User-Agents conforme necessário
+    ]
+
+    accept_languages = [
+        "en-US,en;q=0.9",
+        "en-GB,en;q=0.9",
+        "pt-BR,pt;q=0.8,en-US;q=0.6,en;q=0.4",
+        "es-ES,es;q=0.8,en;q=0.5",
+        "de-DE,de;q=0.8,en;q=0.5",
+        "fr-FR,fr;q=0.9,en-US;q=0.8,en;q=0.6",
+        "it-IT,it;q=0.9,en-US;q=0.8,en;q=0.6",
+        # Adicione mais variações de linguagens conforme necessário
+    ]
+
+    # Cabeçalhos adicionais para emular uma navegação real
+    headers = {
+        "User-Agent": random.choice(user_agents),
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Accept-Language": random.choice(accept_languages),
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Referer": "https://www.google.com/",
+        "Connection": "keep-alive",
+        "DNT": "1",  # Do Not Track header
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-User": "?1",
+        "Sec-Fetch-Dest": "document",
+        "TE": "Trailers",  # Usado em algumas requisições HTTP/2
+        "Origin": "https://www.google.com",
+        "X-Requested-With": "XMLHttpRequest"  # Simula requisições AJAX comuns
+    }
+
+    return headers
 
 @app.post("/generate_token")
 async def generate_token(request: Request):
@@ -497,14 +544,7 @@ async def search_products_by_type_endpoint():
             "format": "json",
             "engines": "buscape,zoom"
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/58.0.3029.110 Safari/537.3",
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive"
-        }
+        headers = generate_random_headers()
 
         try:
             search_response = await load_balancer_request(data, headers)
@@ -569,14 +609,7 @@ async def search_product(request: ProductRequest):
             "format": "json",
             "engines": "buscape,zoom"
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/58.0.3029.110 Safari/537.3",
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive"
-        }
+        headers = generate_random_headers()
         search_response = await load_balancer_request(data, headers)
         # Log do status e conteúdo da resposta
         print(f"Status Code: {search_response.status_code}")
