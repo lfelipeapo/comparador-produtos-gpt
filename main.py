@@ -374,11 +374,11 @@ async def search_product(request: ProductRequest):
             raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
 
     try:
-        products = search_results.get('results')
-        print(f"Produtos obtidos: {products}")
-        if not products:
-            raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
-        result = send_products_to_api(products, ASSISTANT_ID_GROUP)
+        # products = search_results.get('results')
+        # print(f"Produtos obtidos: {products}")
+        # if not products:
+        #     raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
+        result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
         print(f"Resposta do assistente: {result}")
 
         # Tente carregar o JSON diretamente da resposta
