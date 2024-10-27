@@ -12,6 +12,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
+from typing import Any
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
@@ -30,6 +31,10 @@ ALLOWED_IPS = ["179.145.62.197", "177.96.21.178", "179.87.199.45", "100.20.92.10
 ALLOWED_DOMAINS = ["meutudo.com.br", "deploymenttest.meutudo.com.br"]
 
 app = FastAPI()
+
+class CustomJSONResponse(JSONResponse):
+    def render(self, content: Any) -> bytes:
+        return json.dumps(content, ensure_ascii=False).encode("utf-8")
 
 @app.post("/generate_token")
 async def generate_token(request: Request):
@@ -53,7 +58,7 @@ async def generate_token(request: Request):
     token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
     # Retornar o token no header da resposta
-    response = JSONResponse(content={'message': 'Token gerado com sucesso!'})
+    response = CustomJSONResponse(content={'message': 'Token gerado com sucesso!'})
     response.headers['Authorization'] = f'Bearer {token}'
     return response
 
@@ -292,7 +297,7 @@ def validate_and_sanitize_product_name(product_name: str):
     return product_name
 
 # Endpoint de pesquisa de produtos
-@app.post("/search_product/")
+@app.post("/search_product/", response_class=CustomJSONResponse)
 async def search_product(request: ProductRequest):
     # Extrair o nome do produto do corpo da requisição
     product_name = request.product_name
