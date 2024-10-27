@@ -351,6 +351,39 @@ async def search_product(request: ProductRequest):
     except Exception as e:
         print(f"Erro ao processar a resposta do assistente: {e}")
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
+
+# Função auxiliar para buscar produtos por tipo
+async def fetch_product_type(product_type):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/58.0.3029.110 Safari/537.3",
+            "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive"
+        }
+        data = {
+            "q": f"{product_name}",
+            "format": "json",
+            "engines": "buscape,zoom"
+        }
+        search_response = await load_balancer_request(data, headers)
+        # Verifica se o status da resposta é 200 (OK)
+        if search_response.status_code != 200:
+            return (product_type, {"error": "Falha na pesquisa."})
+        # Tenta fazer o parsing do JSON
+        search_results = search_response.json()
+        products = search_results.get('results', [])
+        return (product_type, products)
+    except httpx.RequestError as e:
+        print(f"Erro ao conectar ao serviço de pesquisa para o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
+    except json.JSONDecodeError:
+        return (product_type, {"error": "Resposta do serviço de pesquisa não é um JSON válido."})
+    except Exception as e:
+        print(f"Erro inesperado ao buscar o tipo {product_type}: {e}")
+        return (product_type, {"error": "Falha na pesquisa."})
         
 # Função para pesquisar produtos por tipo
 async def search_products_by_type():
