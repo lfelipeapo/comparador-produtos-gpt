@@ -126,16 +126,24 @@ async def get_token_from_endpoint(endpoint):
 async def load_balancer_request(data, headers, timeout=30):
     for endpoint in SEARXNG_ENDPOINTS:
         try:
-            # Obtenha e utilize o token uma vez
+            # Obter o token antes de fazer a requisição
             token = await get_token_from_endpoint(endpoint)
             headers["Authorization"] = token
-
-            async with httpx.AsyncClient() as client:
-                response = await client.post(f"{endpoint}/search", data=data, headers=headers, timeout=timeout)
+            
+            async with httpx.AsyncClient() as client_http:
+                response = await client_http.post(
+                    f"{endpoint}/search",
+                    data=data,
+                    headers=headers,
+                    timeout=timeout
+                )
                 if response.status_code == 200:
                     return response
-        except httpx.RequestError:
-            print(f"Falha no endpoint {endpoint}")
+                else:
+                    print(f"Falha no endpoint {endpoint}: {response.status_code}")
+                    print(f"Resposta: {response.text}")
+        except httpx.RequestError as e:
+            print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 # Função para enviar a lista de produtos para a API
@@ -212,49 +220,74 @@ def validate_and_sanitize_product_name(product_name: str):
 
     return product_name
 
+# Endpoint de pesquisa de produtos
 @app.post("/search_product/")
 async def search_product(request: ProductRequest):
-    # Receber e sanitizar o nome do produto
-    product_name = validate_and_sanitize_product_name(request.product_name)
-    print(f"[Fluxo] Iniciando pesquisa para o produto: {product_name}")
+    # Extrair o nome do produto do corpo da requisição
+    product_name = request.product_name
+    print(f"Recebendo requisição para produto: {product_name}")
+    
+    # Validar e sanitizar o nome do produto
+    product_name = validate_and_sanitize_product_name(product_name)
+    print(f"Produto sanitizado: {product_name}")
 
     try:
-        # Prepara requisição de pesquisa
         data = {
             "q": f"{product_name} (site:zoom.com.br OR site:buscape.com.br)",
             "format": "json"
         }
         headers = {
-            "User-Agent": "Mozilla/5.0 ...",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                          "AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/58.0.3029.110 Safari/537.3",
             "Accept": "application/json",
+            "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive"
         }
-        # Faz a requisição uma vez e armazena o token para reuso
         search_response = await load_balancer_request(data, headers)
-        
-        # Processa resposta
+        # Log do status e conteúdo da resposta
+        print(f"Status Code: {search_response.status_code}")
+        print(f"Response Content: {search_response.text}")
+
         if search_response.status_code != 200:
-            raise HTTPException(status_code=503, detail="Erro no serviço de pesquisa")
-        
+            raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro.")
+
         search_results = search_response.json()
     except httpx.RequestError as e:
-        raise HTTPException(status_code=503, detail="Falha de conexão")
+        print(f"Erro ao conectar ao serviço de pesquisa: {e}")
+        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
     except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="JSON inválido")
+        raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail="Erro interno")
+        print(f"Erro inesperado: {e}")
+        raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
-    # Verificação de resposta
-    products = search_results.get("results", [])
-    if not products:
-        raise HTTPException(status_code=404, detail="Nenhum produto encontrado")
+    if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
+        print("Erro: Resposta de pesquisa inválida ou inesperada.")
+        raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
 
-    # Enviar resposta para a API
     try:
+        products = search_results.get('results', [])
+        print(f"Produtos obtidos: {products}")
         result = send_products_to_api(products, ASSISTANT_ID_GROUP)
+        print(f"Resposta do assistente: {result}")
+
+        # Tente carregar o JSON diretamente da resposta
+        if isinstance(result, str):
+            result = json.loads(result)
+        elif not isinstance(result, dict):
+            raise ValueError("Formato da resposta inesperado")
+
         return result
-    except json.JSONDecodeError:
-        return {"error": "JSON inválido na resposta do assistente"}
+    except json.JSONDecodeError as e:
+        print(f"Erro ao converter a resposta do assistente para JSON: {e}")
+        return {"error": "Resposta do assistente não é um JSON válido."}
+    except ValueError as ve:
+        print(f"Erro de formato na resposta do assistente: {ve}")
+        return {"error": "Formato da resposta do assistente é inesperado."}
+    except Exception as e:
+        print(f"Erro ao processar a resposta do assistente: {e}")
+        return {"error": f"Erro ao processar a resposta do assistente: {e}"}
         
 # Função auxiliar para buscar produtos por tipo
 async def fetch_product_type(product_type):
