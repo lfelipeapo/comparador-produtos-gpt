@@ -325,11 +325,7 @@ async def search_product(request: ProductRequest):
             raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
 
     try:
-        products_list = search_results.get('results', [])
-        if len(product_list) > 0:
-            products = search_results.get('results')
-        else:
-            products = {}
+        products = search_results.get('results')
         print(f"Produtos obtidos: {products}")
         if not products:
             raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
