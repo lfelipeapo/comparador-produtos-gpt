@@ -147,7 +147,7 @@ async def load_balancer_request(data, headers, timeout=30):
             print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
-ddef verifica_engines_nao_responsivas(search_response):
+def verifica_engines_nao_responsivas(search_response):
     unresponsive = search_response.get('unresponsive_engines', [])
     motores_suspensos = [motor for motor, mensagem in unresponsive if 'acesso negado' in mensagem.lower()]
     return motores_suspensos
