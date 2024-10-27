@@ -111,8 +111,8 @@ class ProductRequest(BaseModel):
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def get_token_from_endpoint(endpoint):
     try:
-        async with httpx.AsyncClient() as client:
-            response = await client.post(f"{endpoint}/generate_token")
+        async with httpx.AsyncClient() as client_http:
+            response = await client_http.post(f"{endpoint}/generate_token")
             if response.status_code == 200 and "Authorization" in response.headers:
                 token = response.headers["Authorization"]
                 return token
@@ -147,10 +147,11 @@ async def load_balancer_request(data, headers, timeout=30):
             print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
-def verifica_engines_nao_responsivas(search_response):
+ddef verifica_engines_nao_responsivas(search_response):
     unresponsive = search_response.get('unresponsive_engines', [])
     motores_suspensos = [motor for motor, mensagem in unresponsive if 'acesso negado' in mensagem.lower()]
     return motores_suspensos
+
 def gerar_prompt_alternativo(product_name):
     return f"{product_name} +R$ +preço site:(google.com/shopping OR mercadolivre.com.br OR buscape.com.br OR zoom.com.br OR magazineluiza.com.br OR casasbahia.com.br OR americanas.com.br OR amazon.com.br) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
 
@@ -258,9 +259,6 @@ async def search_product(request: ProductRequest):
         print(f"Status Code: {search_response.status_code}")
         print(f"Response Content: {search_response.text}")
 
-        if search_response.status_code != 200:
-            raise HTTPException(status_code=503, detail="Serviço de pesquisa retornou um erro.")
-
         search_results = search_response.json()
     except httpx.RequestError as e:
         print(f"Erro ao conectar ao serviço de pesquisa: {e}")
@@ -285,14 +283,21 @@ async def search_product(request: ProductRequest):
         data_alternativo = {
             "q": prompt_alternativo,
             "format": "json",
-            "engines": "google,mercadolivre,amazonia,magazineluiza,casa_bahia,americanas"
+            "engines": "google,mercadolivre,amazon,magazineluiza,casasbahia,americanas"
         }
         try:
             search_response_alternativo = await load_balancer_request(data_alternativo, headers)
+            print(f"Status Code (Alternativo): {search_response_alternativo.status_code}")
+            print(f"Response Content (Alternativo): {search_response_alternativo.text}")
+
             if search_response_alternativo.status_code != 200:
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
 
             search_results = search_response_alternativo.json()
+
+            # Verificar se a busca alternativo retornou resultados
+            if not search_results.get('results'):
+                raise HTTPException(status_code=404, detail="Nenhum produto encontrado na busca alternativa.")
         except httpx.RequestError as e:
             print(f"Erro ao conectar ao serviço de pesquisa alternativo: {e}")
             raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa alternativo.")
@@ -305,6 +310,8 @@ async def search_product(request: ProductRequest):
     try:
         products = search_results.get('results', [])
         print(f"Produtos obtidos: {products}")
+        if not products:
+            raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
         result = send_products_to_api(products, ASSISTANT_ID_GROUP)
         print(f"Resposta do assistente: {result}")
 
@@ -321,6 +328,8 @@ async def search_product(request: ProductRequest):
     except ValueError as ve:
         print(f"Erro de formato na resposta do assistente: {ve}")
         return {"error": "Formato da resposta do assistente é inesperado."}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Erro ao processar a resposta do assistente: {e}")
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
