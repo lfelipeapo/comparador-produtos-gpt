@@ -21,6 +21,7 @@ ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_ENDPOINTS = [
     "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/",
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
+    "https://searxng-5scs.onrender.com",
     # "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
     # "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
     # "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
@@ -582,7 +583,7 @@ async def search_products_by_type_endpoint():
         data = {
             "q": sanitized_type,
             "format": "json",
-            # "engines": "buscape,zoom"
+            "engines": "buscape,zoom"
         }
         token = await get_token()
         headers = generate_random_headers()
@@ -676,7 +677,7 @@ async def search_product(request: ProductRequest):
     data = {
         "q": product_name,
         "format": "json",
-        # "engines": "buscape,zoom"
+        "engines": "buscape,zoom"
     }
     token = await get_token()
     headers = generate_random_headers()
