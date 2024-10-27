@@ -228,10 +228,9 @@ async def get_token():
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(params, timeout=30):
-    token = await get_token()
-
     for endpoint in SEARXNG_ENDPOINTS:
         try:
+            token = await get_token()
             headers = generate_random_headers()
             headers["Authorization"] = token
             
