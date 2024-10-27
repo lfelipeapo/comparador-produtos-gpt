@@ -279,7 +279,7 @@ async def search_product(request: ProductRequest):
         print(f"Erro inesperado: {e}")
         raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
-    if not search_results ou not isinstance(search_results, dict) ou 'results' not in search_results:
+    if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
         print("Erro: Resposta de pesquisa inválida ou inesperada.")
         raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
 
