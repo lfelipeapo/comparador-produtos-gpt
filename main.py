@@ -227,13 +227,9 @@ async def get_token():
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
-async def load_balancer_request(params, timeout=30):
+async def load_balancer_request(params, headers, timeout=30):
     for endpoint in SEARXNG_ENDPOINTS:
         try:
-            token = await get_token()
-            headers = generate_random_headers()
-            headers["Authorization"] = token
-            
             async with httpx.AsyncClient() as client_http:
                 response = await client_http.post(
                     f"{endpoint}/search",
@@ -589,10 +585,12 @@ async def search_products_by_type_endpoint():
             "format": "json",
             # "engines": "buscape,zoom"
         }
-        # headers = generate_random_headers()
+        token = await get_token()
+        headers = generate_random_headers()
+        headers["Authorization"] = token
 
         try:
-            search_response = await load_balancer_request(data)
+            search_response = await load_balancer_request(data, headers)
             search_results = search_response.json()
 
             if not search_results or 'results' not in search_results:
@@ -629,6 +627,9 @@ async def search_products_by_type_endpoint():
                     continue
 
                 # Chama novamente a função para tentar com outro endpoint
+                token = await get_token()
+                headers = generate_random_headers()
+                headers["Authorization"] = token
                 search_response = await load_balancer_request(data, headers)
                 search_results = search_response.json()
 
@@ -692,10 +693,12 @@ async def search_product(request: ProductRequest):
         "format": "json",
         # "engines": "buscape,zoom"
     }
+    token = await get_token()
+    headers = generate_random_headers()
+    headers["Authorization"] = token
 
     try:
-        # headers = generate_random_headers()
-        search_response = await load_balancer_request(data)
+        search_response = await load_balancer_request(data, headers)
         # Log do status e conteúdo da resposta
         print(f"Status Code: {search_response.status_code}")
         print(f"Response Content: {search_response.text}")
@@ -743,7 +746,10 @@ async def search_product(request: ProductRequest):
                 return {"erro": True, "mensagemErro": "Nenhum endpoint disponível para processar a solicitação."}
 
             # Tenta novamente com o próximo endpoint
-            search_response = await load_balancer_request(data, generate_random_headers())
+            token = await get_token()
+            headers = generate_random_headers()
+            headers["Authorization"] = token
+            search_response = await load_balancer_request(data, headers)
             search_results = search_response.json()
 
             if not search_results or 'results' not in search_results:
