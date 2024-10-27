@@ -26,7 +26,7 @@ SEARXNG_ENDPOINTS = [
     # "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
 ]
 SECRET_KEY = os.getenv('SECRET_KEY')
-ALLOWED_IPS = ["179.145.62.197", "177.96.21.178", "100.20.92.101", "44.225.181.72", "44.227.217.144"]
+ALLOWED_IPS = ["179.145.62.197", "177.96.21.178", "179.87.199.45", "100.20.92.101", "44.225.181.72", "44.227.217.144"]
 ALLOWED_DOMAINS = ["meutudo.com.br", "deploymenttest.meutudo.com.br"]
 
 app = FastAPI()
