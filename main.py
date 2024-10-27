@@ -309,9 +309,9 @@ def validate_and_sanitize_product_name(product_name: str):
 
     return product_name
 
-# Endpoint de pesquisa de produtos por tipo refatorado
 @app.post("/search_products_by_type/")
 async def search_products_by_type_endpoint():
+    # Lista de tipos de produtos (mantida sem alterações)
     product_types = [
         "geladeira",
         "fogão",
@@ -574,7 +574,6 @@ async def search_products_by_type_endpoint():
     ]
 
     categorias = {}
-    tried_endpoints = set()
 
     for product_type in product_types:
         sanitized_type = validate_and_sanitize_product_name(product_type)
@@ -598,35 +597,30 @@ async def search_products_by_type_endpoint():
                 categorias[product_type] = {"error": "Resposta inválida do serviço de pesquisa."}
                 continue
 
-            products = search_results.get('results', [])
-            print(f"Produtos obtidos para {product_type}: {products}")
-
-            if not products:
-                categorias[product_type] = {"error": "Nenhum produto encontrado."}
-                continue
-
-            # Enviar os produtos ao GPT
-            resultado_assistente = send_products_to_api(products, ASSISTANT_ID_GROUP)
+            # Enviar o JSON completo ao GPT
+            resultado_assistente = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
             print(f"Resposta do assistente para {product_type}: {resultado_assistente}")
 
             # Converter a resposta do GPT para JSON
-            if isinstance(resultado_assistente, str):
-                resultado_assistente = json.loads(resultado_assistente)
-            elif not isinstance(resultado_assistente, dict):
-                raise ValueError("Formato da resposta inesperado")
+            try:
+                resultado_assistente = json.loads(resultado_assistente) if isinstance(resultado_assistente, str) else resultado_assistente
+                if not isinstance(resultado_assistente, dict):
+                    raise ValueError("Formato da resposta inesperado")
+            except json.JSONDecodeError:
+                categorias[product_type] = {"error": "Resposta do assistente não é um JSON válido."}
+                continue
 
             if resultado_assistente.get('erro') == True and resultado_assistente.get('mensagemErro') == "Nenhum produto válido encontrado ou entrada inválida.":
                 print(f"Erro detectado para {product_type}: {resultado_assistente['mensagemErro']}. Tentando outro endpoint.")
                 # Remove o endpoint atual dos disponíveis e tenta novamente
                 current_endpoint = SEARXNG_ENDPOINTS[0]
-                tried_endpoints.add(current_endpoint)
                 SEARXNG_ENDPOINTS.pop(0)
 
                 if not SEARXNG_ENDPOINTS:
                     categorias[product_type] = {"error": "Nenhum endpoint disponível para processar a solicitação."}
                     continue
 
-                # Chama novamente a função para tentar com outro endpoint
+                # Tenta novamente com o próximo endpoint
                 token = await get_token()
                 headers = generate_random_headers()
                 headers["Authorization"] = token
@@ -638,31 +632,23 @@ async def search_products_by_type_endpoint():
                     categorias[product_type] = {"error": "Resposta inválida do serviço de pesquisa após tentar outro endpoint."}
                     continue
 
-                products = search_results.get('results', [])
-                print(f"Produtos obtidos para {product_type} após tentar outro endpoint: {products}")
-
-                if not products:
-                    categorias[product_type] = {"error": "Nenhum produto encontrado após tentar outro endpoint."}
-                    continue
-
-                # Enviar novamente os produtos ao GPT
-                resultado_assistente = send_products_to_api(products, ASSISTANT_ID_GROUP)
+                resultado_assistente = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
                 print(f"Resposta do assistente para {product_type} após tentar outro endpoint: {resultado_assistente}")
 
-                # Converter a resposta do GPT para JSON
-                if isinstance(resultado_assistente, str):
-                    resultado_assistente = json.loads(resultado_assistente)
-                elif not isinstance(resultado_assistente, dict):
-                    raise ValueError("Formato da resposta inesperado após tentar outro endpoint")
+                try:
+                    resultado_assistente = json.loads(resultado_assistente) if isinstance(resultado_assistente, str) else resultado_assistente
+                    if not isinstance(resultado_assistente, dict):
+                        raise ValueError("Formato da resposta inesperado após tentar outro endpoint")
+                except json.JSONDecodeError:
+                    categorias[product_type] = {"error": "Resposta do assistente não é um JSON válido após tentar outro endpoint."}
+                    continue
 
                 categorias[product_type] = resultado_assistente.get('categorias', {})
             else:
                 categorias[product_type] = resultado_assistente.get('categorias', {})
-        
+
         except HTTPException as he:
             categorias[product_type] = {"error": he.detail}
-        except json.JSONDecodeError:
-            categorias[product_type] = {"error": "Resposta do assistente não é um JSON válido."}
         except ValueError as ve:
             categorias[product_type] = {"error": "Formato da resposta do assistente é inesperado."}
         except Exception as e:
@@ -676,8 +662,7 @@ async def search_products_by_type_endpoint():
     }
 
     return resultado_final
-
-# Endpoint de pesquisa de produto individual
+    
 @app.post("/search_product/")
 async def search_product(request: ProductRequest):
     # Extrair o nome do produto do corpo da requisição
@@ -721,20 +706,16 @@ async def search_product(request: ProductRequest):
         raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
 
     try:
-        products = search_results.get('results', [])
-        print(f"Produtos obtidos: {products}")
-
-        if not products:
-            raise HTTPException(status_code=400, detail="Nenhum produto encontrado.")
-
-        resultado_assistente = send_products_to_api(products, ASSISTANT_ID_GROUP)
+        resultado_assistente = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
         print(f"Resposta do assistente: {resultado_assistente}")
 
         # Converter a resposta do assistente para JSON
-        if isinstance(resultado_assistente, str):
-            resultado_assistente = json.loads(resultado_assistente)
-        elif not isinstance(resultado_assistente, dict):
-            raise ValueError("Formato da resposta inesperado")
+        try:
+            resultado_assistente = json.loads(resultado_assistente) if isinstance(resultado_assistente, str) else resultado_assistente
+            if not isinstance(resultado_assistente, dict):
+                raise ValueError("Formato da resposta inesperado")
+        except json.JSONDecodeError:
+            raise ValueError("Resposta do assistente não é um JSON válido")
 
         if resultado_assistente.get('erro') == True and resultado_assistente.get('mensagemErro') == "Nenhum produto válido encontrado ou entrada inválida.":
             print(f"Erro detectado para {product_name}: {resultado_assistente['mensagemErro']}. Tentando outro endpoint.")
@@ -756,21 +737,15 @@ async def search_product(request: ProductRequest):
                 print(f"Erro: Resposta de pesquisa inválida para o produto {product_name} após tentar outro endpoint.")
                 return {"erro": True, "mensagemErro": "Resposta inválida do serviço de pesquisa após tentar outro endpoint."}
 
-            products = search_results.get('results', [])
-            print(f"Produtos obtidos para {product_name} após tentar outro endpoint: {products}")
-
-            if not products:
-                return {"erro": True, "mensagemErro": "Nenhum produto encontrado após tentar outro endpoint."}
-
-            # Enviar novamente os produtos ao GPT
-            resultado_assistente = send_products_to_api(products, ASSISTANT_ID_GROUP)
+            resultado_assistente = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
             print(f"Resposta do assistente para {product_name} após tentar outro endpoint: {resultado_assistente}")
 
-            # Converter a resposta do GPT para JSON
-            if isinstance(resultado_assistente, str):
-                resultado_assistente = json.loads(resultado_assistente)
-            elif not isinstance(resultado_assistente, dict):
-                raise ValueError("Formato da resposta inesperado após tentar outro endpoint")
+            try:
+                resultado_assistente = json.loads(resultado_assistente) if isinstance(resultado_assistente, str) else resultado_assistente
+                if not isinstance(resultado_assistente, dict):
+                    raise ValueError("Formato da resposta inesperado após tentar outro endpoint")
+            except json.JSONDecodeError:
+                return {"erro": True, "mensagemErro": "Resposta do assistente não é um JSON válido após tentar outro endpoint."}
 
             return resultado_assistente
         else:
@@ -778,9 +753,6 @@ async def search_product(request: ProductRequest):
 
     except HTTPException as he:
         return {"erro": True, "mensagemErro": he.detail}
-    except json.JSONDecodeError as e:
-        print(f"Erro ao converter a resposta do assistente para JSON: {e}")
-        return {"erro": True, "mensagemErro": "Resposta do assistente não é um JSON válido."}
     except ValueError as ve:
         print(f"Erro de formato na resposta do assistente: {ve}")
         return {"erro": True, "mensagemErro": "Formato da resposta do assistente é inesperado."}
