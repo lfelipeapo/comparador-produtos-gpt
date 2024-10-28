@@ -2,6 +2,7 @@ backoff
 fastapi
 openai
 httpx
+unidecode
 uvicorn
 pydantic
 pyjwt
