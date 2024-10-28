@@ -129,7 +129,7 @@ async def get_token_from_endpoint(endpoint):
         raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
-async def load_balancer_request(data, headers, timeout=30):
+async def load_balancer_request(params, headers, timeout=30):
     for endpoint in SEARXNG_ENDPOINTS:
         try:
             # Obter o token antes de fazer a requisição
@@ -137,9 +137,9 @@ async def load_balancer_request(data, headers, timeout=30):
             headers["Authorization"] = token
             
             async with httpx.AsyncClient() as client_http:
-                response = await client_http.post(
+                response = await client_http.get(
                     f"{endpoint}/search",
-                    data=data,
+                    params=params,
                     headers=headers,
                     timeout=timeout
                 )
