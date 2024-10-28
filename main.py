@@ -13,6 +13,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
 from typing import Any
+from unidecode import unidecode
 
 # Configurar o cliente OpenAI com a chave correta
 OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY')
