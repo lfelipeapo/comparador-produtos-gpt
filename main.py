@@ -161,10 +161,10 @@ def verifica_engines_nao_responsivas(search_response):
             motores_suspensos.append(motor)
     
     # Confirma se ambos os motores estão suspensos
-    if 'buscape' in motores_suspensos and 'zoom' in motores_suspensos:
-        return ['buscape', 'zoom']
+    if 'buscape' in motores_suspensos or 'zoom' in motores_suspensos:
+        return true
     
-    return motores_suspensos
+    return false
 
 def gerar_prompt_alternativo(product_name):
     sites = " OR ".join([
@@ -345,7 +345,7 @@ async def search_product(request: ProductRequest):
     # Verificação de motores não responsivos
     motores_suspensos = verifica_engines_nao_responsivas(search_results)
 
-    if motores_suspensos == ['buscape', 'zoom']:
+    if motores_suspensos:
         print(f"Motores suspensos detectados: {motores_suspensos}")
         # Utiliza o prompt alternativo se os motores principais estiverem suspensos
         prompt_alternativo = gerar_prompt_alternativo(product_name)
