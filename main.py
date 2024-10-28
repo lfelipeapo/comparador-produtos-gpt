@@ -319,9 +319,11 @@ async def search_product(request: ProductRequest):
                           "Chrome/58.0.3029.110 Safari/537.3",
             "Accept": "application/json",
             "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive"
+            "Connection": "keep-alive",
+            "Content-type": "application/json; charset=utf-8",
         }
         search_response = await load_balancer_request(data, headers)
+        search_response
         # Log do status e conteúdo da resposta
         print(f"Status Code: {search_response.status_code}")
         print(f"Response Content: {search_response.text}")
@@ -409,7 +411,8 @@ async def search_product(request: ProductRequest):
 #                           "Chrome/58.0.3029.110 Safari/537.3",
 #             "Accept": "application/json",
 #             "Accept-Encoding": "gzip, deflate",
-#             "Connection": "keep-alive"
+#             "Connection": "keep-alive",
+#             "Content-type": "application/json; charset=utf-8",
 #         }
 #         data = {
 #             "q": product_type,
