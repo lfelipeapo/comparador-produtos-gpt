@@ -361,7 +361,8 @@ async def search_product(request: ProductRequest):
             if search_response_alternativo.status_code != 200:
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
 
-            search_results = search_response_alternativo.json()
+            search_results = search_response_alternativo
+            print(f"Response Search Results (Alternativo): {search_response_alternativo.json().text}")
 
             # Verificar se a busca alternativo retornou resultados
             if not search_results.get('results'):
