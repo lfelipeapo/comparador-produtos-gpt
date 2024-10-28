@@ -294,6 +294,12 @@ def validate_and_sanitize_product_name(product_name: str):
         if re.search(rf"\b{keyword}\b", product_name, re.IGNORECASE):
             raise HTTPException(status_code=400, detail="Nome do produto contém termos suspeitos.")
 
+    # Substituir 'ç' por 'c'
+    product_name = product_name.replace('ç', 'c').replace('Ç', 'C')
+
+    # Remover acentos usando unidecode
+    product_name = unidecode(product_name)
+
     return product_name
 
 # Endpoint de pesquisa de produtos
@@ -362,7 +368,7 @@ async def search_product(request: ProductRequest):
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
 
             search_results = search_response_alternativo
-            print(f"Response Search Results (Alternativo): {search_response_alternativo.json().text}")
+            print(f"Response Search Results (Alternativo): {search_response_alternativo.json()}")
 
             # Verificar se a busca alternativo retornou resultados
             if not search_results.get('results'):
