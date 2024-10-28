@@ -162,7 +162,7 @@ def verifica_engines_nao_responsivas(search_response):
             motores_suspensos.append(motor)
     
     # Verifica se ambos os motores 'buscape' e 'zoom' estão suspensos
-    if 'buscape' in motores_suspensos or 'zoom' in motores_suspensos:
+    if 'buscape' in motores_suspensos and 'zoom' in motores_suspensos:
         return ['buscape', 'zoom']
     
     return motores_suspensos
@@ -384,10 +384,6 @@ async def search_product(request: ProductRequest):
             raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
 
     try:
-        # products = search_results.get('results')
-        # print(f"Produtos obtidos: {products}")
-        # if not products:
-        #     raise HTTPException(status_code=404, detail="Nenhum produto encontrado.")
         result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
         print(f"Resposta do assistente: {result}")
 
@@ -410,6 +406,11 @@ async def search_product(request: ProductRequest):
         print(f"Erro ao processar a resposta do assistente: {e}")
         return {"error": f"Erro ao processar a resposta do assistente: {e}"}
 
+# Endpoint de saúde para verificação rápida
+@app.get("/health")
+async def health_check():
+    return {"status": "OK"}
+        
 # # Função auxiliar para buscar produtos por tipo
 # async def fetch_product_type(product_type):
 #     try:
@@ -739,8 +740,3 @@ async def search_product(request: ProductRequest):
 # @app.post("/search_products_by_type/")
 # async def search_products_by_type_endpoint():
 #     return await search_products_by_type()
-
-# Endpoint de saúde para verificação rápida
-@app.get("/health")
-async def health_check():
-    return {"status": "OK"}
