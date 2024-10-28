@@ -372,7 +372,7 @@ async def search_product(request: ProductRequest):
             print(f"Response Search Results (Alternativo): {search_response_alternativo.json()}")
 
             # Verificar se a busca alternativo retornou resultados
-            if not search_results.get('results'):
+            if not search_results:
                 raise HTTPException(status_code=404, detail="Nenhum produto encontrado na busca alternativa.")
         except httpx.RequestError as e:
             print(f"Erro ao conectar ao serviço de pesquisa alternativo: {e}")
