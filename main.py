@@ -130,7 +130,7 @@ async def get_token_from_endpoint(endpoint):
         raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
-async def load_balancer_request(data, headers, timeout=30):
+async def load_balancer_request(data, headers, timeout=60):
     for endpoint in SEARXNG_ENDPOINTS:
         try:
             # Obter o token antes de fazer a requisição
@@ -243,7 +243,7 @@ def send_products_to_api(products, assistant_id):
     )
 
     # Verificar o status do run até ser concluído
-    timeout = 30
+    timeout = 60
     start_time = time.time()
     while run.status != "completed":
         run = client.beta.threads.runs.retrieve(
