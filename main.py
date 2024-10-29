@@ -37,6 +37,42 @@ class CustomJSONResponse(JSONResponse):
     def render(self, content: Any) -> bytes:
         return json.dumps(content, ensure_ascii=False).encode("utf-8")
 
+def verificar_e_renovar_token(token: str) -> str:
+    try:
+        tempo_atual = time.time()
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        
+        # Verifica se o token já expirou ou está prestes a expirar
+        if payload['exp'] <= tempo_atual or payload['exp'] - tempo_atual < 300:
+            # Gera um novo token
+            novo_payload = {
+                'ip': payload['ip'],
+                'domain': payload['domain'],
+                'exp': tempo_atual + 3600  # Novo token válido por 1 hora
+            }
+            novo_token = jwt.encode(novo_payload, SECRET_KEY, algorithm='HS256')
+            return f"Bearer {novo_token}"
+        
+        # Se o token ainda é válido e não está próximo de expirar, retorna o mesmo token
+        return f"Bearer {token}"
+    except jwt.ExpiredSignatureError:
+        # Se não foi possível decodificar o token porque já expirou, tenta renovar
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"], options={"verify_exp": False})
+            novo_payload = {
+                'ip': payload['ip'],
+                'domain': payload['domain'],
+                'exp': time.time() + 3600  # Novo token válido por 1 hora
+            }
+            novo_token = jwt.encode(novo_payload, SECRET_KEY, algorithm='HS256')
+            return f"Bearer {novo_token}"
+        except:
+            # Se não for possível renovar, então lançamos uma exceção
+            raise HTTPException(status_code=403, detail='Token expirado e não pode ser renovado. Por favor, gere um novo token.')
+    except jwt.InvalidTokenError as e:
+        print(f"Erro de token JWT: {e}")
+        raise HTTPException(status_code=403, detail='Token inválido!')
+
 @app.post("/generate_token")
 async def generate_token(request: Request):
     # Validação de IP e Domínio
@@ -65,27 +101,25 @@ async def generate_token(request: Request):
 
 class JWTMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        # Ignorar validação para a rota /generate_token
         if request.url.path == "/generate_token":
             return await call_next(request)
 
-        # Verificação do token JWT
         token = request.headers.get('Authorization')
-        
         if token and token.startswith("Bearer "):
             token = token.split(" ")[1]
-            
+        
         if not token:
             raise HTTPException(status_code=403, detail='Token é necessário!')
 
         try:
-            jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=403, detail='Token expirado!')
-        except jwt.InvalidTokenError as e:
-            print(f"Erro de token JWT: {e}")
-            raise HTTPException(status_code=403, detail='Token inválido!')
-
+            novo_token = verificar_e_renovar_token(token)
+            request.state.token = novo_token
+            response = await call_next(request)
+            response.headers['Authorization'] = novo_token
+            return response
+        except HTTPException as e:
+            return CustomJSONResponse(status_code=e.status_code, content={"detail": e.detail})
+            
         # Validação de IP e Domínio
         client_ip = request.client.host
         referer = request.headers.get('Referer')
@@ -145,6 +179,10 @@ async def load_balancer_request(data, headers, timeout=60):
                     timeout=timeout
                 )
                 if response.status_code == 200:
+                    # Verificar se o token foi renovado
+                    novo_token = response.headers.get('Authorization')
+                    if novo_token:
+                        headers["Authorization"] = novo_token
                     return response
                 else:
                     print(f"Falha no endpoint {endpoint}: {response.status_code}")
