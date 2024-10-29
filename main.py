@@ -366,7 +366,35 @@ async def search_product(request: ProductRequest):
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
 
             search_results = search_response_alternativo.json()
-            print(f"Response Search Results (Alternativo): {search_results
+            print(f"Response Search Results (Alternativo): {search_results}")
+
+            if not search_results:
+                raise ValueError("Nenhum produto encontrado na busca alternativa.")
+
+        result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
+        print(f"Resposta do assistente: {result}")
+
+        if isinstance(result, str):
+            result = json.loads(result)
+        elif not isinstance(result, dict):
+            raise ValueError("Formato da resposta inesperado")
+
+        return result
+
+    except httpx.RequestError as e:
+        print(f"Erro ao conectar ao serviço de pesquisa: {e}")
+        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
+    except json.JSONDecodeError as e:
+        print(f"Erro ao decodificar JSON: {e}")
+        raise HTTPException(status_code=500, detail="Resposta não é um JSON válido.")
+    except ValueError as ve:
+        print(f"Erro de valor: {ve}")
+        raise HTTPException(status_code=500, detail=str(ve))
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Erro inesperado: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
                                                             
 # Endpoint de saúde para verificação rápida
 @app.get("/health")
