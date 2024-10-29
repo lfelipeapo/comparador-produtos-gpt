@@ -224,53 +224,64 @@ def gerar_prompt_alternativo(product_name):
     
     # Retorna o prompt formatado
     return fr"{product_name} +R$ +preco ({sites}) -inurl:blog -inurl:promocao -melhores -melhor -/busca -/blog -lista."
-# Função para enviar a lista de produtos para a API
+    
 def send_products_to_api(products, assistant_id):
-    # Criar o thread
-    thread = client.beta.threads.create()
+    try:
+        # Criar o thread
+        thread = client.beta.threads.create()
 
-    # Adicionar mensagens ao thread
-    message = client.beta.threads.messages.create(
-        thread_id=thread.id,
-        role="user",
-        content=f"{products}"
-    )
-
-    # Executar o thread com o assistente v2
-    run = client.beta.threads.runs.create(
-        thread_id=thread.id,
-        assistant_id=assistant_id
-    )
-
-    # Verificar o status do run até ser concluído
-    timeout = 60
-    start_time = time.time()
-    while run.status != "completed":
-        run = client.beta.threads.runs.retrieve(
+        # Adicionar mensagens ao thread
+        message = client.beta.threads.messages.create(
             thread_id=thread.id,
-            run_id=run.id
+            role="user",
+            content=f"{products}"
         )
-        time.sleep(0.5)
-        if time.time() - start_time > timeout:
-            raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
 
-    # Recuperar as mensagens do thread após o run ser completado
-    messages = client.beta.threads.messages.list(
-        thread_id=thread.id
-    )
+        # Executar o thread com o assistente v2
+        run = client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=assistant_id
+        )
 
-    # Extrair as informações da resposta do OpenAI
-    result = None
-    for message in messages:
-        for content in message.content:
-            if content.text:
-                result = content.text.value
+        # Verificar o status do run até ser concluído
+        timeout = 60
+        start_time = time.time()
+        while run.status != "completed":
+            run = client.beta.threads.runs.retrieve(
+                thread_id=thread.id,
+                run_id=run.id
+            )
+            time.sleep(0.5)
+            if time.time() - start_time > timeout:
+                raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
+
+        # Recuperar as mensagens do thread após o run ser completado
+        messages = client.beta.threads.messages.list(
+            thread_id=thread.id
+        )
+
+        # Extrair as informações da resposta do OpenAI
+        result = None
+        for message in messages:
+            for content in message.content:
+                if content.text:
+                    result = content.text.value
+                    break
+            if result:
                 break
-        if result:
-            break
 
-    # Retornar a última resposta do assistente
-    return result
+        if not result:
+            raise ValueError("Não foi possível extrair uma resposta válida do assistente")
+
+        return result
+
+    except HTTPException as he:
+        # Repassar exceções HTTP
+        raise he
+    except Exception as e:
+        # Logar o erro e levantar uma exceção HTTP genérica
+        print(f"Erro ao processar produtos na API: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar a requisição: {str(e)}")
 
 def validate_and_sanitize_product_name(product_name: str):
     # Validar se existe nome de produto
@@ -303,64 +314,50 @@ def validate_and_sanitize_product_name(product_name: str):
 
     return product_name
 
-# Endpoint de pesquisa de produtos
 @app.post("/search_product/", response_class=CustomJSONResponse)
 async def search_product(request: ProductRequest):
-    # Extrair o nome do produto do corpo da requisição
-    product_name = request.product_name
-    print(f"Recebendo requisição para produto: {product_name}")
-    
-    # Validar e sanitizar o nome do produto
-    product_name = validate_and_sanitize_product_name(product_name)
-    print(f"Produto sanitizado: {product_name}")
-
     try:
+        # Extrair o nome do produto do corpo da requisição
+        product_name = request.product_name
+        print(f"Recebendo requisição para produto: {product_name}")
+        
+        # Validar e sanitizar o nome do produto
+        product_name = validate_and_sanitize_product_name(product_name)
+        print(f"Produto sanitizado: {product_name}")
+        
         data = {
             "q": product_name,
             "format": "json",
             "engines": "buscape,zoom"
         }
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                          "AppleWebKit/537.36 (KHTML, like Gecko) "
-                          "Chrome/58.0.3029.110 Safari/537.3",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
             "Accept": "application/json",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
-            # "Content-type": "application/json; charset=utf-8",
         }
         search_response = await load_balancer_request(data, headers)
-        search_response
+        
         # Log do status e conteúdo da resposta
         print(f"Status Code: {search_response.status_code}")
         print(f"Response Content: {search_response.text}")
 
         search_results = search_response.json()
-    except httpx.RequestError as e:
-        print(f"Erro ao conectar ao serviço de pesquisa: {e}")
-        raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa não é um JSON válido.")
-    except Exception as e:
-        print(f"Erro inesperado: {e}")
-        raise HTTPException(status_code=500, detail="Erro interno do servidor.")
 
-    if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
-        print("Erro: Resposta de pesquisa inválida ou inesperada.")
-        raise HTTPException(status_code=500, detail="Resposta inválida: campo 'results' ausente.")
+        if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
+            raise ValueError("Resposta inválida: campo 'results' ausente.")
 
-    # Verificação de motores não responsivos
-    motores_suspensos = verifica_engines_nao_responsivas(search_results)
+        # Verificação de motores não responsivos
+        motores_suspensos = verifica_engines_nao_responsivas(search_results)
 
-    if motores_suspensos == ['buscape', 'zoom']:
-        print(f"Motores suspensos detectados: {motores_suspensos}")
-        # Utiliza o prompt alternativo se os motores principais estiverem suspensos
-        prompt_alternativo = gerar_prompt_alternativo(product_name)
-        data_alternativo = {
-            "q": prompt_alternativo,
-            "format": "json",
-        }
-        try:
+        if motores_suspensos == ['buscape', 'zoom']:
+            print(f"Motores suspensos detectados: {motores_suspensos}")
+            # Utiliza o prompt alternativo se os motores principais estiverem suspensos
+            prompt_alternativo = gerar_prompt_alternativo(product_name)
+            data_alternativo = {
+                "q": prompt_alternativo,
+                "format": "json",
+            }
             search_response_alternativo = await load_balancer_request(data_alternativo, headers)
             print(f"Status Code (Alternativo): {search_response_alternativo.status_code}")
             print(f"Response Content (Alternativo): {search_response_alternativo.text}")
@@ -368,44 +365,9 @@ async def search_product(request: ProductRequest):
             if search_response_alternativo.status_code != 200:
                 raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
 
-            search_results = search_response_alternativo
-            print(f"Response Search Results (Alternativo): {search_response_alternativo.json()}")
-
-            # Verificar se a busca alternativo retornou resultados
-            if not search_results:
-                raise HTTPException(status_code=404, detail="Nenhum produto encontrado na busca alternativa.")
-        except httpx.RequestError as e:
-            print(f"Erro ao conectar ao serviço de pesquisa alternativo: {e}")
-            raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa alternativo.")
-        except json.JSONDecodeError:
-            raise HTTPException(status_code=500, detail="Resposta do serviço de pesquisa alternativo não é um JSON válido.")
-        except Exception as e:
-            print(f"Erro inesperado na pesquisa alternativa: {e}")
-            raise HTTPException(status_code=500, detail="Erro interno do servidor na pesquisa alternativa.")
-
-    try:
-        result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
-        print(f"Resposta do assistente: {result}")
-
-        # Tente carregar o JSON diretamente da resposta
-        if isinstance(result, str):
-            result = json.loads(result)
-        elif not isinstance(result, dict):
-            raise ValueError("Formato da resposta inesperado")
-
-        return result
-    except json.JSONDecodeError as e:
-        print(f"Erro ao converter a resposta do assistente para JSON: {e}")
-        return {"error": "Resposta do assistente não é um JSON válido."}
-    except ValueError as ve:
-        print(f"Erro de formato na resposta do assistente: {ve}")
-        return {"error": "Formato da resposta do assistente é inesperado."}
-    except HTTPException as he:
-        raise he
-    except Exception as e:
-        print(f"Erro ao processar a resposta do assistente: {e}")
-        return {"error": f"Erro ao processar a resposta do assistente: {e}"}
-
+            search_results = search_response_alternativo.json()
+            print(f"Response Search Results (Alternativo): {search_results
+                                                            
 # Endpoint de saúde para verificação rápida
 @app.get("/health")
 async def health_check():
