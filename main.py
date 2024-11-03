@@ -374,6 +374,7 @@ async def search_product(request: ProductRequest):
             "Accept": "application/json",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
+            "Referer": "https://meutudo.com.br"
         }
         
         # Faz a primeira tentativa com os motores principais
@@ -463,6 +464,7 @@ async def health_check():
 #             "Accept": "application/json",
 #             "Accept-Encoding": "gzip, deflate",
 #             "Connection": "keep-alive",
+#             "Referer": "https://meutudo.com.br"
 #             "Content-type": "application/json; charset=utf-8",
 #         }
 #         data = {
