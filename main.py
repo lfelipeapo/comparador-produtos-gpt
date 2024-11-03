@@ -196,7 +196,7 @@ def verifica_engines_nao_responsivas(search_response):
     motores_suspensos = []
 
     for motor, mensagem in unresponsive:
-        if 'acesso negado' in mensagem.lower():
+        if 'acesso negado' or 'tempo esgotado' in mensagem.lower():
             motores_suspensos.append(motor)
     
     # Verifica se ambos os motores 'buscape' e 'zoom' estão suspensos
