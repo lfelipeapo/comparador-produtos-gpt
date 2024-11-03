@@ -357,6 +357,7 @@ async def search_product(request: ProductRequest):
     try:
         # Extrair e sanitizar o nome do produto
         product_name = validate_and_sanitize_product_name(request.product_name)
+        print(f"[LOG] Produto recebido para busca: {product_name}")
         
         data = {
             "q": product_name,
@@ -372,13 +373,17 @@ async def search_product(request: ProductRequest):
         
         # Faz a primeira tentativa com os motores principais
         search_response = await load_balancer_request(data, headers)
+        print(f"[LOG] Resposta dos motores principais: Status {search_response.status_code}, Conteúdo: {search_response.text}")
+        
         search_results = search_response.json()
+        print(f"[LOG] Resultados da primeira tentativa: {search_results}")
 
         # Verifica motores suspensos e recorre ao alternativo se necessário
         motores_suspensos = verifica_engines_nao_responsivas(search_results)
+        print(f"[LOG] Motores suspensos: {motores_suspensos}")
 
         if motores_suspensos == ['buscape', 'zoom']:
-            print("Motores 'buscape' e 'zoom' indisponíveis. Tentando com endpoint alternativo.")
+            print("[LOG] Motores 'buscape' e 'zoom' indisponíveis. Tentando com endpoint alternativo.")
             
             # Configura o prompt alternativo
             prompt_alternativo = gerar_prompt_alternativo(product_name)
@@ -388,48 +393,56 @@ async def search_product(request: ProductRequest):
             }
 
             # Loop para tentar o endpoint alternativo
-            for _ in range(3):  # Limita a 3 tentativas para evitar chamadas desnecessárias
+            for tentativa in range(1, 4):  # Limita a 3 tentativas para evitar chamadas desnecessárias
+                print(f"[LOG] Tentativa {tentativa} com endpoint alternativo para '{product_name}' com prompt: {prompt_alternativo}")
                 search_response_alternativo = await load_balancer_request(data_alternativo, headers)
                 
-                # Verifica se o alternativo foi bem-sucedido
+                # Loga o status e o conteúdo da resposta da tentativa com o alternativo
+                print(f"[LOG] Resposta do endpoint alternativo: Status {search_response_alternativo.status_code}, Conteúdo: {search_response_alternativo.text}")
+                
                 if search_response_alternativo.status_code == 200:
                     search_results = search_response_alternativo.json()
+                    print(f"[LOG] Resultados obtidos na tentativa {tentativa} do alternativo: {search_results}")
                     
                     # Se encontrou resultados válidos, interrompe o loop e processa a resposta
                     if search_results.get("results"):
-                        print("Resultado válido encontrado no endpoint alternativo.")
+                        print(f"[LOG] Resultado válido encontrado no endpoint alternativo na tentativa {tentativa}")
                         break
                     else:
-                        print("Nenhum resultado encontrado na tentativa atual do alternativo.")
+                        print(f"[LOG] Nenhum resultado encontrado na tentativa {tentativa} do alternativo.")
                 else:
-                    print("Falha no endpoint alternativo. Tentando novamente...")
+                    print(f"[LOG] Falha no endpoint alternativo na tentativa {tentativa}. Tentando novamente...")
 
         # Envia os resultados processados para a API do assistente
+        print(f"[LOG] Enviando resultados processados para a API do assistente. Dados: {search_results}")
         result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
 
         # Processa a resposta do assistente e retorna
+        print(f"[LOG] Resposta do assistente recebida: {result}")
         if isinstance(result, str):
             result = json.loads(result)
         elif not isinstance(result, dict):
             raise ValueError("Formato da resposta inesperado")
 
+        print("[LOG] Retornando resultados finais para o cliente.")
         return result
 
     except httpx.RequestError as e:
-        print(f"Erro ao conectar ao serviço de pesquisa: {e}")
+        print(f"[ERRO] Erro ao conectar ao serviço de pesquisa: {e}")
         raise HTTPException(status_code=503, detail="Não foi possível conectar ao serviço de pesquisa.")
     except json.JSONDecodeError as e:
-        print(f"Erro ao decodificar JSON: {e}")
+        print(f"[ERRO] Erro ao decodificar JSON: {e}")
         raise HTTPException(status_code=500, detail="Resposta não é um JSON válido.")
     except ValueError as ve:
-        print(f"Erro de valor: {ve}")
+        print(f"[ERRO] Erro de valor: {ve}")
         raise HTTPException(status_code=500, detail=str(ve))
     except HTTPException as he:
+        print(f"[ERRO] HTTPException: {he.detail}")
         raise he
     except Exception as e:
-        print(f"Erro inesperado: {str(e)}")
+        print(f"[ERRO] Erro inesperado: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
-                                                            
+
 # Endpoint de saúde para verificação rápida
 @app.get("/health")
 async def health_check():
