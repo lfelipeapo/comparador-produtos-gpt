@@ -23,9 +23,9 @@ SEARXNG_ENDPOINTS = [
     "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/",
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
     "https://marine-cougar-lipe-7c0433f9.koyeb.app/",
-    # "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
-    # "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
-    # "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
+    "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
+    "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
+    "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
 ]
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALLOWED_IPS = ["179.145.62.197", "177.96.21.178", "179.87.199.45", "100.20.92.101", "44.225.181.72", "44.227.217.144"]
@@ -163,9 +163,14 @@ async def get_token_from_endpoint(endpoint):
         print(f"Erro ao conectar ao endpoint {endpoint} para token: {e}")
         raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
 
+import random
+
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(data, headers, timeout=60):
-    for endpoint in SEARXNG_ENDPOINTS:
+    endpoints = SEARXNG_ENDPOINTS[:]  # Cria uma cópia da lista de endpoints
+    random.shuffle(endpoints)  # Embaralha a lista de endpoints para randomizar a ordem
+
+    for endpoint in endpoints:
         try:
             # Obter o token antes de fazer a requisição
             token = await get_token_from_endpoint(endpoint)
