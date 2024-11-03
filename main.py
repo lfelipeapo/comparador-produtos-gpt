@@ -354,6 +354,26 @@ def validate_and_sanitize_product_name(product_name: str):
 
     return product_name
 
+# Lista de User-Agents populares para variar entre as requisições
+USER_AGENTS = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Firefox/55.0 Safari/537.3",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/13.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0",
+    "Mozilla/5.0 (Linux; Android 10; SM-G975F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.93 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile Safari/604.1"
+]
+
+# Função para gerar cabeçalhos dinâmicos
+def generate_headers():
+    return {
+        "User-Agent": random.choice(USER_AGENTS),  # Seleciona um User-Agent aleatório
+        "Accept": "application/json",
+        "Accept-Encoding": "gzip, deflate",
+        "Connection": random.choice(["keep-alive", "close"]),  # Alterna entre 'keep-alive' e 'close'
+        "Referer": "https://meutudo.com.br"
+    }
+
 @app.post("/search_product/", response_class=CustomJSONResponse)
 async def search_product(request: ProductRequest):
     try:
@@ -366,13 +386,7 @@ async def search_product(request: ProductRequest):
             "format": "json",
             "engines": "buscape,zoom"
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json",
-            "Accept-Encoding": "gzip, deflate",
-            "Connection": "keep-alive",
-            "Referer": "https://meutudo.com.br"
-        }
+        headers = generate_headers()
         
         # Faz a primeira tentativa com os motores principais
         search_response = await load_balancer_request(data, headers)
