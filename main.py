@@ -355,13 +355,8 @@ def validate_and_sanitize_product_name(product_name: str):
 @app.post("/search_product/", response_class=CustomJSONResponse)
 async def search_product(request: ProductRequest):
     try:
-        # Extrair o nome do produto do corpo da requisição
-        product_name = request.product_name
-        print(f"Recebendo requisição para produto: {product_name}")
-        
-        # Validar e sanitizar o nome do produto
-        product_name = validate_and_sanitize_product_name(product_name)
-        print(f"Produto sanitizado: {product_name}")
+        # Extrair e sanitizar o nome do produto
+        product_name = validate_and_sanitize_product_name(request.product_name)
         
         data = {
             "q": product_name,
@@ -369,49 +364,50 @@ async def search_product(request: ProductRequest):
             "engines": "buscape,zoom"
         }
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3",
+            "User-Agent": "Mozilla/5.0",
             "Accept": "application/json",
             "Accept-Encoding": "gzip, deflate",
             "Connection": "keep-alive",
         }
-        search_response = await load_balancer_request(data, headers)
         
-        # Log do status e conteúdo da resposta
-        print(f"Status Code: {search_response.status_code}")
-        print(f"Response Content: {search_response.text}")
-
+        # Faz a primeira tentativa com os motores principais
+        search_response = await load_balancer_request(data, headers)
         search_results = search_response.json()
 
-        if not search_results or not isinstance(search_results, dict) or 'results' not in search_results:
-            raise ValueError("Resposta inválida: campo 'results' ausente.")
-
-        # Verificação de motores não responsivos
+        # Verifica motores suspensos e recorre ao alternativo se necessário
         motores_suspensos = verifica_engines_nao_responsivas(search_results)
 
         if motores_suspensos == ['buscape', 'zoom']:
-            print(f"Motores suspensos detectados: {motores_suspensos}")
-            # Utiliza o prompt alternativo se os motores principais estiverem suspensos
+            print("Motores 'buscape' e 'zoom' indisponíveis. Tentando com endpoint alternativo.")
+            
+            # Configura o prompt alternativo
             prompt_alternativo = gerar_prompt_alternativo(product_name)
             data_alternativo = {
                 "q": prompt_alternativo,
                 "format": "json",
             }
-            search_response_alternativo = await load_balancer_request(data_alternativo, headers)
-            print(f"Status Code (Alternativo): {search_response_alternativo.status_code}")
-            print(f"Response Content (Alternativo): {search_response_alternativo.text}")
 
-            if search_response_alternativo.status_code != 200:
-                raise HTTPException(status_code=503, detail="Serviço de pesquisa alternativo retornou um erro.")
+            # Loop para tentar o endpoint alternativo
+            for _ in range(3):  # Limita a 3 tentativas para evitar chamadas desnecessárias
+                search_response_alternativo = await load_balancer_request(data_alternativo, headers)
+                
+                # Verifica se o alternativo foi bem-sucedido
+                if search_response_alternativo.status_code == 200:
+                    search_results = search_response_alternativo.json()
+                    
+                    # Se encontrou resultados válidos, interrompe o loop e processa a resposta
+                    if search_results.get("results"):
+                        print("Resultado válido encontrado no endpoint alternativo.")
+                        break
+                    else:
+                        print("Nenhum resultado encontrado na tentativa atual do alternativo.")
+                else:
+                    print("Falha no endpoint alternativo. Tentando novamente...")
 
-            search_results = search_response_alternativo.json()
-            print(f"Response Search Results (Alternativo): {search_results}")
-
-            if not search_results:
-                raise ValueError("Nenhum produto encontrado na busca alternativa.")
-
+        # Envia os resultados processados para a API do assistente
         result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
-        print(f"Resposta do assistente: {result}")
 
+        # Processa a resposta do assistente e retorna
         if isinstance(result, str):
             result = json.loads(result)
         elif not isinstance(result, dict):
