@@ -22,10 +22,7 @@ ASSISTANT_ID_GROUP = os.environ.get('ASSISTANT_ID_GROUP')
 SEARXNG_ENDPOINTS = [
     "https://smoggy-yasmeen-lfelipeapo-97ab6e01.koyeb.app/",
     "https://pesquisa-mt-q7m2taf0ob.koyeb.app/",
-    "https://marine-cougar-lipe-7c0433f9.koyeb.app/",
-    "https://meutudo-search-u69koy43zgt5zonu.onrender.com",
-    "https://mt-pesquisa-2uw5m7edjspsu5xh.onrender.com",
-    "https://search-mt-w5r6poyq8ojutb2w.onrender.com",
+    "https://marine-cougar-lipe-7c0433f9.koyeb.app/"
 ]
 SECRET_KEY = os.getenv('SECRET_KEY')
 ALLOWED_IPS = ["179.145.62.197", "177.96.21.178", "179.87.199.45", "100.20.92.101", "44.225.181.72", "44.227.217.144"]
