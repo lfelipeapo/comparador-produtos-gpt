@@ -162,37 +162,40 @@ async def get_token_from_endpoint(endpoint):
 
 import random
 
-@backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
-async def load_balancer_request(data, headers, timeout=60):
-    endpoints = SEARXNG_ENDPOINTS[:]  # Cria uma cópia da lista de endpoints
-    random.shuffle(endpoints)  # Embaralha a lista de endpoints para randomizar a ordem
+def should_continue_trying(response):
+    if 'error' in response and response['error'] and 'code' in response['error'] and response['error']['code'] == 'false':
+        return False
+    if 'results' in response and response['results'] and len(response['results']) > 0:
+        return False
+    return True
 
-    for endpoint in endpoints:
-        try:
-            # Delay aleatorio
-            await asyncio.sleep(random.uniform(0.5, 2.0))
-            # Obter o token antes de fazer a requisição
-            token = await get_token_from_endpoint(endpoint)
-            headers["Authorization"] = token
-            
-            async with httpx.AsyncClient() as client_http:
-                response = await client_http.post(
-                    f"{endpoint}/search",
-                    data=data,
-                    headers=headers,
-                    timeout=timeout
-                )
-                if response.status_code == 200:
-                    # Verificar se o token foi renovado
-                    novo_token = response.headers.get('Authorization')
-                    if novo_token:
-                        headers["Authorization"] = novo_token
-                    return response
-                else:
-                    print(f"Falha no endpoint {endpoint}: {response.status_code}")
-                    print(f"Resposta: {response.text}")
-        except httpx.RequestError as e:
-            print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
+@backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
+async def load_balancer_request(data, headers, timeout=60, max_attempts=3):
+    endpoints = SEARXNG_ENDPOINTS[:]  # Cria uma cópia da lista de endpoints
+    for _ in range(max_attempts):
+        random.shuffle(endpoints)  # Embaralha a lista de endpoints para randomizar a ordem
+        for endpoint in endpoints:
+            try:
+                # Delay aleatorio
+                await asyncio.sleep(random.uniform(0.5, 2.0))
+                # Obter o token antes de fazer a requisição
+                token = await get_token_from_endpoint(endpoint)
+                headers["Authorization"] = token
+                async with httpx.AsyncClient() as client_http:
+                    response = await client_http.post(
+                        f"{endpoint}/search", data=data, headers=headers, timeout=timeout
+                    )
+                    if response.status_code == 200:
+                        search_response = response.json()
+                        if not should_continue_trying(search_response):  # Verifica se deve continuar ou não
+                            # Verificar se o token foi renovado
+                            novo_token = response.headers.get('Authorization')
+                            if novo_token:
+                                headers["Authorization"] = novo_token
+                            return search_response
+            except httpx.RequestError as e:
+                print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
+        # Se todos os endpoints falharem, pode escolher continuar ou parar
     raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
 
 def verifica_engines_nao_responsivas(search_response):
