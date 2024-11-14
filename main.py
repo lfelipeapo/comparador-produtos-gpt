@@ -171,33 +171,59 @@ def should_continue_trying(response):
 
 @backoff.on_exception(backoff.expo, httpx.RequestError, max_tries=3)
 async def load_balancer_request(data, headers, timeout=60, max_attempts=3):
-    endpoints = SEARXNG_ENDPOINTS[:]  # Cria uma cópia da lista de endpoints
-    for _ in range(max_attempts):
-        random.shuffle(endpoints)  # Embaralha a lista de endpoints para randomizar a ordem
+    endpoints = SEARXNG_ENDPOINTS[:].copy()
+    
+    for attempt in range(max_attempts):
+        random.shuffle(endpoints)
+        
         for endpoint in endpoints:
             try:
-                # Delay aleatorio
-                await asyncio.sleep(random.uniform(0.5, 2.0))
-                # Obter o token antes de fazer a requisição
+                # Log detalhado de cada tentativa
+                print(f"Tentativa {attempt + 1} no endpoint: {endpoint}")
+                
+                # Obter o token
                 token = await get_token_from_endpoint(endpoint)
                 headers["Authorization"] = token
+                
+                # Delay aleatório
+                await asyncio.sleep(random.uniform(0.5, 2.0))
+                
                 async with httpx.AsyncClient() as client_http:
                     response = await client_http.post(
-                        f"{endpoint}/search", data=data, headers=headers, timeout=timeout
+                        f"{endpoint}/search", 
+                        data=data, 
+                        headers=headers, 
+                        timeout=timeout
                     )
+                    
+                    # Log do status da resposta
+                    print(f"Status da resposta: {response.status_code}")
+                    
                     if response.status_code == 200:
                         search_response = response.json()
-                        if not should_continue_trying(search_response):  # Verifica se deve continuar ou não
+                        
+                        # Log do conteúdo da resposta
+                        print(f"Conteúdo da resposta: {search_response}")
+                        
+                        if not should_continue_trying(search_response):
                             # Verificar se o token foi renovado
                             novo_token = response.headers.get('Authorization')
                             if novo_token:
                                 headers["Authorization"] = novo_token
-                            return response  # Retorna a resposta completa
-            except httpx.RequestError as e:
-                print(f"Erro ao conectar ao endpoint {endpoint}: {e}")
-        # Se todos os endpoints falharem, pode escolher continuar ou parar
-    raise HTTPException(status_code=503, detail="Todos os endpoints falharam.")
-
+                            
+                            return response
+                    
+                    # Se o status não for 200, continua no loop
+                    print(f"Resposta não bem-sucedida: {response.status_code}")
+            
+            except Exception as e:
+                # Log detalhado de qualquer exceção
+                print(f"Erro no endpoint {endpoint}: {str(e)}")
+                continue
+    
+    # Se todos os endpoints falharem
+    raise HTTPException(status_code=503, detail="Todos os endpoints falharam")
+    
 def verifica_engines_nao_responsivas(search_response):
     unresponsive = search_response.get('unresponsive_engines', [])
     motores_suspensos = []
@@ -369,7 +395,6 @@ USER_AGENTS = [
     "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile Safari/604.1"
 ]
 
-# Função para gerar cabeçalhos dinâmicos
 # Função para gerar cabeçalhos dinâmicos
 def generate_headers():
     return {
