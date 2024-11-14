@@ -410,44 +410,53 @@ def generate_headers():
 @app.post("/search_product/", response_class=CustomJSONResponse)
 async def search_product(request: ProductRequest):
     try:
-        # Extrair e sanitizar o nome do produto
         product_name = validate_and_sanitize_product_name(request.product_name)
         print(f"[LOG] Produto recebido para busca: {product_name}")
-        
+
         # Configuração inicial
         data = {"q": product_name, "format": "json", "engines": "buscape,zoom"}
         headers = generate_headers()
-        
-        # Tentativa com endpoints principais
-        search_response = await load_balancer_request(data, headers)
-        print(f"[LOG] Resposta dos motores principais: Status {search_response.status_code}, Conteúdo: {search_response.text}")
-        search_results = search_response.json()
-        print(f"[LOG] Resultados da primeira tentativa: {search_results}")
-        
+
+        try:
+            # Tentativa com endpoints principais
+            search_response = await load_balancer_request(data, headers)
+            search_results = search_response.json()
+            
+            # Verifica motores suspensos
+            motores_suspensos = verifica_engines_nao_responsivas(search_results)
+        except HTTPException:
+            # Se todos endpoints falharem, força a execução do prompt alternativo
+            motores_suspensos = ['buscape', 'zoom']
+
         # Verifica se precisa tentar o prompt alternativo
-        motores_suspensos = verifica_engines_nao_responsivas(search_results)
         if motores_suspensos == ['buscape', 'zoom']:
             prompt_alternativo = gerar_prompt_alternativo(product_name)
             data = {"q": prompt_alternativo, "format": "json"}
             
-            # Tenta novamente com o prompt alternativo
-            search_response = await load_balancer_request(data, headers)
-            if search_response.status_code == 200:
-                search_results = search_response.json()
-                print(f"[LOG] Resultados do prompt alternativo: {search_results}")
-        
+            try:
+                # Tenta novamente com o prompt alternativo
+                search_response = await load_balancer_request(data, headers)
+                
+                if search_response.status_code == 200:
+                    search_results = search_response.json()
+                    print(f"[LOG] Resultados do prompt alternativo: {search_results}")
+            except Exception as e:
+                print(f"[ERRO] Falha no prompt alternativo: {str(e)}")
+                raise HTTPException(status_code=500, detail="Falha na busca alternativa")
+
         # Envia os resultados processados para a API do assistente
         result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
-        
-        # Processa a resposta do assistente e retorna
+
+        # Processa a resposta do assistente
         if isinstance(result, str):
             result = json.loads(result)
         elif not isinstance(result, dict):
             raise ValueError("Formato da resposta inesperado")
+
         print("[LOG] Retornando resultados finais para o cliente.")
         return result
+
     except Exception as e:
-        # Tratamento de exceções
         print(f"[ERRO] Erro inesperado: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
 
