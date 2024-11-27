@@ -65,10 +65,10 @@ def verificar_e_renovar_token(token: str) -> str:
             return f"Bearer {novo_token}"
         except:
             # Se não for possível renovar, então lançamos uma exceção
-            raise HTTPException(status_code=403, detail='Token expirado e não pode ser renovado. Por favor, gere um novo token.')
+            raise HTTPException(status_code=401, detail='Token expirado e não pode ser renovado. Por favor, gere um novo token.')
     except jwt.InvalidTokenError as e:
         print(f"Erro de token JWT: {e}")
-        raise HTTPException(status_code=403, detail='Token inválido!')
+        raise HTTPException(status_code=401, detail='Token inválido!')
 
 @app.post("/generate_token")
 async def generate_token(request: Request):
@@ -106,7 +106,7 @@ class JWTMiddleware(BaseHTTPMiddleware):
             token = token.split(" ")[1]
         
         if not token:
-            raise HTTPException(status_code=403, detail='Token é necessário!')
+            raise HTTPException(status_code=401, detail='Token é necessário!')
 
         try:
             novo_token = verificar_e_renovar_token(token)
@@ -155,10 +155,10 @@ async def get_token_from_endpoint(endpoint):
                 return token
             else:
                 print(f"Erro ao obter token de {endpoint}: {response.status_code}")
-                raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
+                raise HTTPException(status_code=401, detail="Erro ao obter token de autenticação")
     except httpx.RequestError as e:
         print(f"Erro ao conectar ao endpoint {endpoint} para token: {e}")
-        raise HTTPException(status_code=503, detail="Erro ao obter token de autenticação")
+        raise HTTPException(status_code=401, detail="Erro ao obter token de autenticação")
 
 import random
 
@@ -222,7 +222,7 @@ async def load_balancer_request(data, headers, timeout=60, max_attempts=3):
                 continue
     
     # Se todos os endpoints falharem
-    raise HTTPException(status_code=503, detail="Todos os endpoints falharam")
+    raise HTTPException(status_code=408, detail="Todos os endpoints falharam")
     
 def verifica_engines_nao_responsivas(search_response):
     unresponsive = search_response.get('unresponsive_engines', [])
@@ -324,7 +324,7 @@ def send_products_to_api(products, assistant_id):
             )
             time.sleep(0.5)
             if time.time() - start_time > timeout:
-                raise HTTPException(status_code=500, detail="Timeout ao executar o thread")
+                raise HTTPException(status_code=408, detail="Timeout ao executar o thread")
 
         # Recuperar as mensagens do thread após o run ser completado
         messages = client.beta.threads.messages.list(
@@ -352,7 +352,7 @@ def send_products_to_api(products, assistant_id):
     except Exception as e:
         # Logar o erro e levantar uma exceção HTTP genérica
         print(f"Erro ao processar produtos na API: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erro ao processar a requisição: {str(e)}")
+        raise HTTPException(status_code=408, detail=f"Erro ao processar a requisição: {str(e)}")
 
 def validate_and_sanitize_product_name(product_name: str):
     # Validar se existe nome de produto
@@ -442,7 +442,7 @@ async def search_product(request: ProductRequest):
                     print(f"[LOG] Resultados do prompt alternativo: {search_results}")
             except Exception as e:
                 print(f"[ERRO] Falha no prompt alternativo: {str(e)}")
-                raise HTTPException(status_code=500, detail="Falha na busca alternativa")
+                raise HTTPException(status_code=408, detail="Falha na busca alternativa")
 
         # Envia os resultados processados para a API do assistente
         result = send_products_to_api(search_results, ASSISTANT_ID_GROUP)
@@ -458,7 +458,7 @@ async def search_product(request: ProductRequest):
 
     except Exception as e:
         print(f"[ERRO] Erro inesperado: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Erro interno do servidor: {str(e)}")
+        raise HTTPException(status_code=408, detail=f"Erro interno do servidor: {str(e)}")
 
 # Endpoint de saúde para verificação rápida
 @app.get("/health")
